@@ -1,0 +1,22 @@
+# 1. Dependency
+node_modules/
+.wrangler/
+
+# 2. Environment Variables & Secrets (สำคัญมาก)
+.dev.vars
+.env
+
+# 3. Local Database & State
+.mf/
+*.sqlite
+*.sqlite-journal
+
+# 4. Logs
+logs
+*.log
+npm-debug.log*
+
+# 5. IDE & OS
+.vscode/
+.idea/
+.DS_Store
