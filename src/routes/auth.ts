@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { sign } from 'hono/jwt'
 
-const auth = new Hono<{ Bindings: { DB: D1Database } }>()
+const auth = new Hono<{ Bindings: { DB: D1Database; JWT_SECRET: string } }>()
 
 auth.post('/register', async (c) => { 
     try {
