@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { sign } from 'hono/jwt'
 
 const auth = new Hono<{ Bindings: { DB: D1Database } }>()
 
@@ -22,10 +23,21 @@ auth.post('/login', async (c) => {
         const db = c.env.DB;
         const user = await db.prepare("SELECT * FROM profiles WHERE username = ? OR email = ?")
         .bind(username, username).first();
+
         if (!user || user.password !== password) {
         return c.json({ success: false, message: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" }, 401);
         }
-        return c.json({ success: true, user: { id: user.id, username: user.username } }, 200);
+        const payload = {
+            id: user.id,
+            username: user.username,
+            exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24, // หมดอายุใน 24 ชม.
+        }
+        const token = await sign(payload, c.env.JWT_SECRET)
+        return c.json({ 
+            success: true, 
+            user: { id: user.id, username: user.username },
+            token: token 
+        }, 200);
     } catch (err: any) {
         return c.json({ success: false, message: err.message }, 500);
     }

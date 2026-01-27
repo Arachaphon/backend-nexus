@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Apartments
-CREATE TABLE apartments (
+-- 2. Dormitories
+CREATE TABLE dormitories (
     id TEXT PRIMARY KEY,
     owner_id TEXT NOT NULL,
     name TEXT NOT NULL,
@@ -25,33 +25,33 @@ CREATE TABLE apartments (
 -- 3. Water Rate Templates
 CREATE TABLE water_rate_templates (
     id TEXT PRIMARY KEY,
-    apartment_id TEXT NOT NULL,
+    dormitories_id TEXT NOT NULL,
     charge_type TEXT NOT NULL,
     price_per_unit REAL,
     minimum_charge REAL,
     flat_rate REAL,
-    FOREIGN KEY (apartment_id) REFERENCES apartments(id)
+    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id)
 );
 
 -- 4. Electric Rate Templates
 CREATE TABLE electric_rate_templates (
     id TEXT PRIMARY KEY,
-    apartment_id TEXT NOT NULL,
+    dormitories_id TEXT NOT NULL,
     charge_type TEXT NOT NULL,
     price_per_unit REAL,
     minimum_charge REAL,
     flat_rate REAL,
-    FOREIGN KEY (apartment_id) REFERENCES apartments(id)
+    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id)
 );
 
 -- 5. Rooms
 CREATE TABLE rooms (
     id TEXT PRIMARY KEY,
-    apartment_id TEXT NOT NULL,
+    dormitories_id TEXT NOT NULL,
     room_number TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'vacant',
     current_rent_price REAL NOT NULL,
-    FOREIGN KEY (apartment_id) REFERENCES apartments(id)
+    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id)
 );
 
 -- 6. Tenants
