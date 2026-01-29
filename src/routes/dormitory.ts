@@ -32,7 +32,7 @@ dormitories.post('/add', async (c) => {
             body.name, 
             body.address, 
             body.phone_number, 
-            body.tax_id || null, // เพิ่ม tax_id และกันเหนียวด้วย null
+            body.tax_id || null,
             body.due_date, 
             body.fine_per_day
         )
