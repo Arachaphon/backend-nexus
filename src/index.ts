@@ -3,7 +3,7 @@ import { cors } from 'hono/cors'
 import authRoutes from './routes/auth'
 import profileRoutes from './routes/profile'
 import dormitoriesRoutes from './routes/dormitory'
-import utilitiesRoutes from './routes/uitility'
+import utilitiesRoutes from './routes/utility'
 
 const app = new Hono()
 
