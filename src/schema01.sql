@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS water_rate_templates;
+DROP TABLE IF EXISTS electric_rate_templates;
 -- 3. Water Rate Templates
 CREATE TABLE water_rate_templates (
     id TEXT PRIMARY KEY,

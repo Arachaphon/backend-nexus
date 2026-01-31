@@ -25,7 +25,7 @@ CREATE TABLE dormitories (
 -- 3. Water Rate Templates
 CREATE TABLE water_rate_templates (
     id TEXT PRIMARY KEY,
-    dormitories_id TEXT NOT NULL,
+    dormitories_id TEXT NOT NULL UNIQUE,
     charge_type TEXT NOT NULL,
     price_per_unit REAL,
     minimum_charge REAL,
@@ -36,7 +36,7 @@ CREATE TABLE water_rate_templates (
 -- 4. Electric Rate Templates
 CREATE TABLE electric_rate_templates (
     id TEXT PRIMARY KEY,
-    dormitories_id TEXT NOT NULL,
+    dormitories_id TEXT NOT NULL UNIQUE,
     charge_type TEXT NOT NULL,
     price_per_unit REAL,
     minimum_charge REAL,
