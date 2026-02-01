@@ -1,9 +1,8 @@
-import { Hono } from 'hono' // ต้อง import Hono ด้วย
+import { Hono } from 'hono' 
 import { jwt } from 'hono/jwt'
 
 const dormitories = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
-// แก้ไข secret: ให้ดึงจาก Environment variable เพื่อความปลอดภัย
 dormitories.use('/*', async (c, next) => {
   const middleware = jwt({ 
     secret: c.env.JWT_SECRET,
@@ -39,6 +38,59 @@ dormitories.post('/add', async (c) => {
         .run();
 
         return c.json({ success: true, dormitory_id: dormitoryId }, 201);
+    } catch (err: any) {
+        return c.json({ success: false, message: err.message }, 500);
+    }
+});
+
+dormitories.get('/info/:id', async (c) => {
+    try {
+        const db = c.env.DB;
+        const dormitoryId = c.req.param('id');
+        const payload = c.get('jwtPayload');
+        const ownerId = payload.id;
+
+        const dormitory = await db.prepare(`
+            SELECT * FROM dormitories WHERE id = ? AND owner_id = ?
+        `)
+        .bind(dormitoryId, ownerId)
+        .first(); // ดึงมาแค่รายการเดียว
+
+        if (!dormitory) {
+            return c.json({ success: false, message: "ไม่พบข้อมูลหอพัก" }, 404);
+        }
+
+        return c.json(dormitory);
+    } catch (err: any) {
+        return c.json({ success: false, message: err.message }, 500);
+    }
+});
+
+dormitories.patch('/update-payment-note', async (c) => {
+    try {
+        const db = c.env.DB;
+        const body = await c.req.json();
+        const payload = c.get('jwtPayload');
+        const ownerId = payload.id;
+        const { dormitoryId, payment_note } = body;
+
+        if (!dormitoryId) {
+            return c.json({ success: false, message: "Missing dormitoryId" }, 400);
+        }
+
+        const result = await db.prepare(`
+            UPDATE dormitories 
+            SET payment_note = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND owner_id = ?
+        `)
+        .bind(payment_note, dormitoryId, ownerId)
+        .run();
+
+        if (result.meta.changes === 0) {
+            return c.json({ success: false, message: "หอพักไม่พบหรือคุณไม่มีสิทธิ์แก้ไข" }, 404);
+        }
+
+        return c.json({ success: true, message: "บันทึกหมายเหตุสำเร็จ" });
     } catch (err: any) {
         return c.json({ success: false, message: err.message }, 500);
     }

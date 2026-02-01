@@ -4,6 +4,7 @@ import authRoutes from './routes/auth'
 import profileRoutes from './routes/profile'
 import dormitoriesRoutes from './routes/dormitory'
 import utilitiesRoutes from './routes/utility'
+import banksRoutes from './routes/bank'
 
 const app = new Hono()
 
@@ -13,5 +14,6 @@ app.route('/api/auth', authRoutes)
 app.route('/api/profile', profileRoutes) 
 app.route('/api/dormitories', dormitoriesRoutes)
 app.route('/api/utilities', utilitiesRoutes)
+app.route('/api/banks', banksRoutes)
 
 export default app
