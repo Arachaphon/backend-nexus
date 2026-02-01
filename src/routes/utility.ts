@@ -71,7 +71,6 @@ utilities.post('/save-settings', async (c) => {
         return c.json({ success: true }, 200);
 
     } catch (err: any) {
-        // ส่งข้อความ Error กลับไปให้ละเอียดเพื่อการ Debug
         console.error("Database Error:", err.message);
         return c.json({ 
             success: false, 
