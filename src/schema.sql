@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 );
 
 -- 2. Dormitories
-CREATE TABLE dormitories (
+CREATE TABLE IF NOT EXISTS dormitories (
     id TEXT PRIMARY KEY,
     owner_id TEXT NOT NULL,
     name TEXT NOT NULL,
@@ -17,8 +17,10 @@ CREATE TABLE dormitories (
     phone_number TEXT NOT NULL,
     tax_id TEXT,
     due_date INTEGER NOT NULL CHECK (due_date >= 1 AND due_date <= 31),
-    fine_per_day REAL NOT NULL, -- ใช้ REAL แทน numeric
+    fine_per_day REAL NOT NULL,
+    payment_note TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (owner_id) REFERENCES profiles(id)
 );
 
@@ -101,4 +103,16 @@ CREATE TABLE bills (
     FOREIGN KEY (room_id) REFERENCES rooms(id),
     FOREIGN KEY (water_template_id) REFERENCES water_rate_templates(id),
     FOREIGN KEY (electric_template_id) REFERENCES electric_rate_templates(id)
+);
+
+-- 9. Bank Accounts
+CREATE TABLE IF NOT EXISTS bank_accounts (
+    id TEXT PRIMARY KEY,
+    dormitories_id TEXT NOT NULL,
+    bank_name TEXT NOT NULL,       -- เช่น 'กสิกรไทย', 'พร้อมเพย์'
+    bank_logo TEXT,                -- เก็บ path เช่น '/kbank.png'
+    account_number TEXT NOT NULL,  -- ใช้ TEXT เพราะอาจมีขีด หรือเป็นเบอร์พร้อมเพย์ที่มีเลข 0 นำหน้า
+    account_name TEXT NOT NULL,    -- ชื่อเจ้าของบัญชี
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id) ON DELETE CASCADE
 );

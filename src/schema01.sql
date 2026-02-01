@@ -1,23 +1,15 @@
-DROP TABLE IF EXISTS water_rate_templates;
-DROP TABLE IF EXISTS electric_rate_templates;
--- 3. Water Rate Templates
-CREATE TABLE water_rate_templates (
+DROP TABLE IF EXISTS dormitories;
+CREATE TABLE IF NOT EXISTS dormitories (
     id TEXT PRIMARY KEY,
-    dormitories_id TEXT NOT NULL UNIQUE,
-    charge_type TEXT NOT NULL,
-    price_per_unit REAL,
-    minimum_charge REAL,
-    flat_rate REAL,
-    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id)
-);
-
--- 4. Electric Rate Templates
-CREATE TABLE electric_rate_templates (
-    id TEXT PRIMARY KEY,
-    dormitories_id TEXT NOT NULL UNIQUE,
-    charge_type TEXT NOT NULL,
-    price_per_unit REAL,
-    minimum_charge REAL,
-    flat_rate REAL,
-    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id)
+    owner_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    address TEXT NOT NULL,
+    phone_number TEXT NOT NULL,
+    tax_id TEXT,
+    due_date INTEGER NOT NULL CHECK (due_date >= 1 AND due_date <= 31),
+    fine_per_day REAL NOT NULL,
+    payment_note TEXT, 
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (owner_id) REFERENCES profiles(id)
 );
