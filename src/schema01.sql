@@ -1,15 +1,14 @@
-DROP TABLE IF EXISTS dormitories;
-CREATE TABLE IF NOT EXISTS dormitories (
+--DROP TABLE IF EXISTS dormitories;
+-- เพิ่มตาราง Floors เพื่อเก็บโครงสร้างอาคาร
+CREATE TABLE IF NOT EXISTS floors (
     id TEXT PRIMARY KEY,
-    owner_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    address TEXT NOT NULL,
-    phone_number TEXT NOT NULL,
-    tax_id TEXT,
-    due_date INTEGER NOT NULL CHECK (due_date >= 1 AND due_date <= 31),
-    fine_per_day REAL NOT NULL,
-    payment_note TEXT, 
+    dormitories_id TEXT NOT NULL,
+    floor_number INTEGER NOT NULL,
+    room_count INTEGER NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (owner_id) REFERENCES profiles(id)
+    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id) ON DELETE CASCADE
 );
+
+-- ปรับปรุงตาราง Rooms (เพิ่ม floor_id เพื่อระบุว่าห้องอยู่ชั้นไหน)
+-- หมายเหตุ: กรณีสร้างใหม่ให้เพิ่ม floor_id TEXT
+ALTER TABLE rooms ADD COLUMN floor_id TEXT REFERENCES floors(id);

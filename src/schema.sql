@@ -53,7 +53,8 @@ CREATE TABLE rooms (
     room_number TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'vacant',
     current_rent_price REAL NOT NULL,
-    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id)
+    floor_id TEXT REFERENCES floors(id),
+    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id),
 );
 
 -- 6. Tenants
@@ -113,6 +114,15 @@ CREATE TABLE IF NOT EXISTS bank_accounts (
     bank_logo TEXT,                -- เก็บ path เช่น '/kbank.png'
     account_number TEXT NOT NULL,  -- ใช้ TEXT เพราะอาจมีขีด หรือเป็นเบอร์พร้อมเพย์ที่มีเลข 0 นำหน้า
     account_name TEXT NOT NULL,    -- ชื่อเจ้าของบัญชี
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS floors (
+    id TEXT PRIMARY KEY,
+    dormitories_id TEXT NOT NULL,
+    floor_number INTEGER NOT NULL,
+    room_count INTEGER NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (dormitories_id) REFERENCES dormitories(id) ON DELETE CASCADE
 );
