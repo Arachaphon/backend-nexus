@@ -49,12 +49,13 @@ CREATE TABLE electric_rate_templates (
 -- 5. Rooms
 CREATE TABLE rooms (
     id TEXT PRIMARY KEY,
-    dormitories_id TEXT NOT NULL,
+    floor_id TEXT NOT NULL,
     room_number TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    -- status: สถานะการเช่า (vacant = ว่าง, occupied = มีคนเช่า, maintenance = ซ่อมแซม)
     status TEXT NOT NULL DEFAULT 'vacant',
-    current_rent_price REAL NOT NULL,
-    floor_id TEXT REFERENCES floors(id),
-    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id),
+    current_rent_price REAL NOT NULL DEFAULT 0,
+    FOREIGN KEY (floor_id) REFERENCES floors(id) ON DELETE CASCADE
 );
 
 -- 6. Tenants
