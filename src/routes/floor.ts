@@ -2,6 +2,8 @@ import { Hono } from 'hono'
 
 const floors = new Hono<{ Bindings: { DB: D1Database } }>()
 
+// ในไฟล์ floor.ts ตรงส่วน floors.post('/floor-setup')
+
 floors.post('/floor-setup', async (c) => {
     try {
         const db = c.env.DB;
@@ -9,43 +11,61 @@ floors.post('/floor-setup', async (c) => {
         const { dormitoryId, floors: floorList } = body;
 
         if (!dormitoryId || !floorList || !Array.isArray(floorList)) {
-            return c.json({ success: false, message: "Missing dormitoryId or floors array" }, 400);
+            return c.json({ success: false, message: "ข้อมูลไม่ครบถ้วน" }, 400);
         }
 
-        const deleteStmt = db.prepare(`DELETE FROM floors WHERE dormitories_id = ?`).bind(dormitoryId);
+        const statements = [];
 
-        const floorStatements = floorList.map((f: any) => {
-            return db.prepare(`
-                INSERT INTO floors (id, dormitories_id, floor_number, room_count, created_at)
-                VALUES (?, ?, ?, ?, ?)
-            `).bind(
-                crypto.randomUUID(), 
-                dormitoryId,
-                f.floor_number,
-                f.room_count,
-                new Date().toISOString()
+        statements.push(db.prepare(`
+            DELETE FROM rooms WHERE floor_id IN (SELECT id FROM floors WHERE dormitories_id = ?)
+        `).bind(dormitoryId));
+
+        statements.push(db.prepare(`
+            DELETE FROM floors WHERE dormitories_id = ?
+        `).bind(dormitoryId));
+
+        for (const f of floorList) {
+            const floorId = crypto.randomUUID();
+            
+            statements.push(
+                db.prepare(`
+                    INSERT INTO floors (id, dormitories_id, floor_number, room_count, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                `).bind(floorId, dormitoryId, f.floor_number, f.room_count, new Date().toISOString())
             );
-        });
 
-        
-        await db.batch([deleteStmt, ...floorStatements]);
+            for (let i = 1; i <= f.room_count; i++) {
+                const roomNumber = `${f.floor_number}${i.toString().padStart(2, '0')}`;
+                statements.push(
+                    db.prepare(`
+                        INSERT INTO rooms (id, floor_id, room_number, is_active, status, current_rent_price)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    `).bind(crypto.randomUUID(), floorId, roomNumber, 1, 'vacant', 0) 
+                );
+            }
+        }
+        await db.batch(statements);
 
-        console.log(`Successfully saved ${floorStatements.length} floors for dormitory:`, dormitoryId);
-
-        return c.json({
-            success: true,
-            message: 'บันทึกข้อมูลชั้นเรียบร้อยแล้ว',
-            data: { count: floorStatements.length }
-        }, 201);
-
-    } catch (err: any) { 
-        console.error("Error setting up floors:", err.message);
-        return c.json({ 
-            success: false, 
-            message: "Database Error: " + err.message,
-            stack: err.stack 
-        }, 500);
+        return c.json({ success: true, message: 'บันทึกชั้นและสร้างห้องเริ่มต้นเรียบร้อย' }, 201);
+    } catch (err: any) {
+        return c.json({ success: false, message: err.message }, 500);
     }
 });
 
+floors.get('/get-floors/:dormitoryId', async (c) => {
+    try {
+        const db = c.env.DB;
+        const dormitoryId = c.req.param('dormitoryId');
+        
+        const result = await db.prepare(
+            `SELECT id, floor_number FROM floors WHERE dormitories_id = ? ORDER BY floor_number ASC`
+        ).bind(dormitoryId).all();
+
+        return c.json({ success: true, data: result.results });
+    } catch (err: any) {
+        return c.json({ success: false, message: err.message }, 500);
+    }
+});
+
+//floors.patch('/update-floor/:id') --> room_count
 export default floors;

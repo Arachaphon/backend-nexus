@@ -6,6 +6,7 @@ import dormitoriesRoutes from './routes/dormitory'
 import utilitiesRoutes from './routes/utility'
 import banksRoutes from './routes/bank'
 import floorsRoutes from './routes/floor'
+import roomsRoutes from './routes/room'
 
 const app = new Hono()
 
@@ -17,6 +18,6 @@ app.route('/api/dormitories', dormitoriesRoutes)
 app.route('/api/utilities', utilitiesRoutes)
 app.route('/api/banks', banksRoutes)
 app.route('/api/floors', floorsRoutes)
-
+app.route('/api/rooms', roomsRoutes)
 
 export default app
