@@ -83,4 +83,72 @@ rooms.get('/get-rooms/:dormitoryId', async (c) => {
     }
 });
 
+rooms.patch('/update-prices', async (c) => {
+    try {
+        const db = c.env.DB;
+        const body = await c.req.json(); // รับ { roomIds: string[], price: number }
+        const { roomId, price, dormitoryId } = body;
+
+        TODO:
+
+        if (!roomId || roomId.length === 0) {
+            return c.json({ success: false, message: 'กรุณาเลือกห้องที่ต้องการอัปเดต' }, 400);
+        }
+
+        const { count } = await db.prepare(`
+            SELECT COUNT(*) as count FROM rooms r
+            JOIN floors f ON r.floor_id = f.id
+            WHERE f.dormitories_id = ? AND r.id IN (${roomId.map(() => '?').join(',')})
+        `).bind(dormitoryId, ...roomId).first() as { count: number };
+
+        if (count !== roomId.length) {
+            return c.json({ success: false, message: 'พบข้อมูลห้องไม่ถูกต้อง หรือคุณไม่มีสิทธิ์เข้าถึง' }, 403);
+        }
+
+        const placeholders = roomId.map(() => '?').join(',');
+        await db.prepare(`
+            UPDATE rooms 
+            SET current_rent_price = ? 
+            WHERE id IN (${placeholders})
+        `).bind(price, ...roomId).run();
+
+        return c.json({ success: true, message: 'อัปเดตราคาสำเร็จ' });
+    } catch (err: any) {
+        return c.json({ success: false, message: err.message }, 500);
+    }
+});
+
+
+rooms.patch('/update-status', async (c) => {
+    try {
+        const db = c.env.DB;
+        const body = await c.req.json();
+        const { roomId, status, dormitoryId } = body; 
+
+        if (!roomId || roomId.length === 0) {
+            return c.json({ success: false, message: 'กรุณาเลือกห้องที่ต้องการ' }, 400);
+        }
+
+        const { count } = await db.prepare(`
+            SELECT COUNT(*) as count FROM rooms r
+            JOIN floors f ON r.floor_id = f.id
+            WHERE f.dormitories_id = ? AND r.id IN (${roomId.map(() => '?').join(',')})
+        `).bind(dormitoryId, ...roomId).first() as { count: number };
+
+        if (count !== roomId.length) {
+            return c.json({ success: false, message: 'ข้อมูลไม่ถูกต้อง' }, 403);
+        }
+
+        const placeholders = roomId.map(() => '?').join(',');
+        await db.prepare(`
+            UPDATE rooms 
+            SET status = ? 
+            WHERE id IN (${placeholders})
+        `).bind(status, ...roomId).run();
+
+        return c.json({ success: true, message: 'อัปเดตสถานะสำเร็จ' });
+    } catch (err: any) {
+        return c.json({ success: false, message: err.message }, 500);
+    }
+});
 export default rooms;
