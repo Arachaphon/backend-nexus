@@ -43,6 +43,39 @@ dormitories.post('/add', async (c) => {
     }
 });
 
+
+dormitories.get('/list', async (c) => {
+    try {
+        const db = c.env.DB;
+        const payload = c.get('jwtPayload');
+        const ownerId = payload.id;
+
+        const { results } = await db.prepare(`
+            SELECT 
+                d.id,
+                d.name,
+                (
+                    SELECT COUNT(r.id) 
+                    FROM rooms r 
+                    JOIN floors f ON r.floor_id = f.id 
+                    WHERE f.dormitories_id = d.id
+                ) as total_rooms,
+                (
+                    SELECT COUNT(r.id) 
+                    FROM rooms r 
+                    JOIN floors f ON r.floor_id = f.id 
+                    WHERE f.dormitories_id = d.id AND r.status = 'vacant'
+                ) as vacant_rooms
+            FROM dormitories d
+            WHERE d.owner_id = ?
+        `).bind(ownerId).all();
+
+        return c.json({ success: true, data: results });
+    } catch (err: any) {
+        return c.json({ success: false, message: err.message }, 500);
+    }
+});
+
 dormitories.get('/info/:id', async (c) => {
     try {
         const db = c.env.DB;
