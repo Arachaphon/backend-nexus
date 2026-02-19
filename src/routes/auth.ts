@@ -33,6 +33,11 @@ auth.post('/login', async (c) => {
             exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24, 
         }
         const token = await sign(payload, c.env.JWT_SECRET)
+        return c.json({ 
+            success: true, 
+            user: { id: user.id, username: user.username },
+            token: token 
+        }, 200);
     } catch (err: any) {
         return c.json({ success: false, message: err.message }, 500);
     }
