@@ -86,7 +86,7 @@ rooms.get('/get-rooms/:dormitoryId', async (c) => {
 rooms.patch('/update-prices', async (c) => {
     try {
         const db = c.env.DB;
-        const body = await c.req.json(); // รับ { roomIds: string[], price: number }
+        const body = await c.req.json(); 
         const { roomId, price, dormitoryId } = body;
 
         TODO:

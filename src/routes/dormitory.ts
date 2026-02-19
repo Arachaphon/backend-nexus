@@ -87,7 +87,7 @@ dormitories.get('/info/:id', async (c) => {
             SELECT * FROM dormitories WHERE id = ? AND owner_id = ?
         `)
         .bind(dormitoryId, ownerId)
-        .first(); // ดึงมาแค่รายการเดียว
+        .first(); 
 
         if (!dormitory) {
             return c.json({ success: false, message: "ไม่พบข้อมูลหอพัก" }, 404);
