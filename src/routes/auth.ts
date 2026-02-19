@@ -16,7 +16,7 @@ auth.post('/register', async (c) => {
         return c.json({ error: err.message }, 500);
     }
 })
-
+//test comite
 auth.post('/login', async (c) => { 
     try {
         const { username, password } = await c.req.json();
@@ -30,7 +30,7 @@ auth.post('/login', async (c) => {
         const payload = {
             id: user.id,
             username: user.username,
-            exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24, // หมดอายุใน 24 ชม.
+            exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24, 
         }
         const token = await sign(payload, c.env.JWT_SECRET)
         return c.json({ 
