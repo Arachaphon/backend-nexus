@@ -16,7 +16,7 @@ auth.post('/register', async (c) => {
         return c.json({ error: err.message }, 500);
     }
 })
-//test comite
+
 auth.post('/login', async (c) => { 
     try {
         const { username, password } = await c.req.json();

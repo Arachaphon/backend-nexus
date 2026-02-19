@@ -32,7 +32,6 @@ banks.post('/add', async (c) => {
             `).bind(payment_note || "", dormitoryId, payload.id)
         ]);
     
-        return c.json({ success: true, bank_id: bankId }, 201);
     } catch (err: any) {
         return c.json({ success: false, message: err.message }, 500);
     }
@@ -47,7 +46,6 @@ banks.delete('/delete/:id', async (c) => {
             .bind(bankId)
             .run();
 
-        return c.json({ success: true, changes: result.meta.changes });
     } catch (err: any) {
         return c.json({ success: false, message: err.message }, 500);
     }
