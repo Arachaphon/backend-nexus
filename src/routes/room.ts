@@ -1,8 +1,17 @@
 import { Hono } from 'hono'
+import { jwt } from 'hono/jwt'
 
-const rooms = new Hono<{ Bindings: { DB: D1Database } }>()
+const rooms = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
-// ในไฟล์ room.ts ส่วน POST /room-setup
+rooms.use('/*', async (c, next) => {
+  const middleware = jwt({
+    secret: c.env.JWT_SECRET,
+    alg: 'HS256'
+  });
+
+  return middleware(c, next);
+});
+
 rooms.post('/room-setup', async (c) => {
     try {
         const db = c.env.DB;
