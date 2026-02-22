@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS dormitories (
     payment_note TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (owner_id) REFERENCES profiles(id)
+    FOREIGN KEY (owner_id) REFERENCES profiles(id) ON DELETE CASCADE
 );
 
 -- 3. Water Rate Templates
@@ -32,7 +32,7 @@ CREATE TABLE water_rate_templates (
     price_per_unit REAL,
     minimum_charge REAL,
     flat_rate REAL,
-    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id)
+    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id) ON DELETE CASCADE
 );
 
 -- 4. Electric Rate Templates
@@ -43,7 +43,16 @@ CREATE TABLE electric_rate_templates (
     price_per_unit REAL,
     minimum_charge REAL,
     flat_rate REAL,
-    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id)
+    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS floors (
+    id TEXT PRIMARY KEY,
+    dormitories_id TEXT NOT NULL,
+    floor_number INTEGER NOT NULL,
+    room_count INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id) ON DELETE CASCADE
 );
 
 -- 5. Rooms
@@ -72,7 +81,7 @@ CREATE TABLE tenants (
     emergency_contact_name TEXT,
     emergency_contact_phone TEXT,
     note TEXT,
-    FOREIGN KEY (current_room_id) REFERENCES rooms(id)
+    FOREIGN KEY (current_room_id) REFERENCES rooms(id) ON DELETE SET NULL
 );
 
 -- 7. Meter Readings
@@ -84,7 +93,7 @@ CREATE TABLE meter_readings (
     electric_unit_current REAL NOT NULL,
     water_unit_previous REAL,
     electric_unit_previous REAL,
-    FOREIGN KEY (room_id) REFERENCES rooms(id)
+    FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
 );
 
 -- 8. Bills
@@ -102,7 +111,7 @@ CREATE TABLE bills (
     total_amount REAL NOT NULL,
     payment_status TEXT NOT NULL DEFAULT 'pending',
     note TEXT,
-    FOREIGN KEY (room_id) REFERENCES rooms(id),
+    FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
     FOREIGN KEY (water_template_id) REFERENCES water_rate_templates(id),
     FOREIGN KEY (electric_template_id) REFERENCES electric_rate_templates(id)
 );
@@ -119,11 +128,3 @@ CREATE TABLE IF NOT EXISTS bank_accounts (
     FOREIGN KEY (dormitories_id) REFERENCES dormitories(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS floors (
-    id TEXT PRIMARY KEY,
-    dormitories_id TEXT NOT NULL,
-    floor_number INTEGER NOT NULL,
-    room_count INTEGER NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (dormitories_id) REFERENCES dormitories(id) ON DELETE CASCADE
-);

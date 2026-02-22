@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { hashPassword, verifyPassword } from '../utils/hash'
 
 const profile = new Hono<{ Bindings: { DB: D1Database } }>()
 
@@ -39,17 +40,17 @@ profile.post('/change-password', async (c) => {
     const { userId, currentPassword, newPassword } = await c.req.json();
     const db = c.env.DB;
 
-    // 1. ตรวจสอบรหัสผ่านเดิม
     const user = await db.prepare("SELECT password FROM profiles WHERE id = ?")
       .bind(userId).first();
 
-    if (!user || user.password !== currentPassword) {
+    const isValid = user ? await verifyPassword(currentPassword, user.password as string) : false;
+    if (!isValid) {
       return c.json({ success: false, message: "รหัสผ่านปัจจุบันไม่ถูกต้อง" }, 401);
     }
 
-    // 2. อัปเดตรหัสผ่านใหม่
+    const hashed = await hashPassword(newPassword); // 🔒 Hash รหัสใหม่
     await db.prepare("UPDATE profiles SET password = ? WHERE id = ?")
-      .bind(newPassword, userId).run();
+      .bind(hashed, userId).run();
 
     return c.json({ success: true, message: "เปลี่ยนรหัสผ่านสำเร็จ" });
   } catch (err: any) {
