@@ -12,6 +12,29 @@ rooms.use('/*', async (c, next) => {
   return middleware(c, next);
 });
 
+rooms.get('/info/:id', async (c) => {
+    try {
+        const db = c.env.DB;
+        const roomId = c.req.param('id');
+        const payload = c.get('jwtPayload');
+        const ownerId = payload.id;
+
+        const room = await db.prepare(`
+            SELECT * FROM rooms WHERE id = ? AND owner_id = ?
+        `)
+        .bind(roomId, ownerId)
+        .first(); 
+
+        if (!room) {
+            return c.json({ success: false, message: "ไม่พบข้อมูลหอพัก" }, 404);
+        }
+
+        return c.json(room);
+    } catch (err: any) {
+        return c.json({ success: false, message: err.message }, 500);
+    }
+});
+
 rooms.post('/room-setup', async (c) => {
     try {
         const db = c.env.DB;
