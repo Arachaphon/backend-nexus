@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
+import { authMiddleware } from '../utils/authMiddleware'
 
 const floors = new Hono<{ Bindings: { DB: D1Database } }>()
 
-// ในไฟล์ floor.ts ตรงส่วน floors.post('/floor-setup')
-
+floors.use('/*', authMiddleware)
 floors.post('/floor-setup', async (c) => {
     try {
         const db = c.env.DB;
