@@ -14,7 +14,7 @@ rooms.use('/*', async (c, next) => {
   return middleware(c, next);
 });
 
-rooms.get('/info/:id', async (c) => {
+rooms.get('/:id', async (c) => {
   try {
     const db = c.env.DB;
     const roomId = c.req.param('id');
@@ -125,21 +125,17 @@ rooms.patch('/', async (c) => {
   try {
     const db = c.env.DB;
     const body = await c.req.json();
-    const { roomIds, dormitoryId, price, status } = body;
+    const { roomId, dormitoryId, price, status } = body
 
-    if (!roomIds || roomIds.length === 0) {
-      return c.json({ success: false, message: 'กรุณาเลือกห้อง' }, 400);
-    }
-
-    const placeholders = roomIds.map(() => '?').join(',');
+    const placeholders = roomId.map(() => '?').join(',');
 
     const { count } = await db.prepare(`
       SELECT COUNT(*) as count FROM rooms r
       JOIN floors f ON r.floor_id = f.id
       WHERE f.dormitories_id = ? AND r.id IN (${placeholders})
-    `).bind(dormitoryId, ...roomIds).first() as { count: number };
+    `).bind(dormitoryId, ...roomId).first() as { count: number };
 
-    if (count !== roomIds.length) {
+    if (count !== roomId.length) {
       return c.json({ success: false, message: 'ข้อมูลไม่ถูกต้อง' }, 403);
     }
 
@@ -164,7 +160,7 @@ rooms.patch('/', async (c) => {
 
     query += updates.join(', ') + ` WHERE id IN (${placeholders})`;
 
-    await db.prepare(query).bind(...values, ...roomIds).run();
+    await db.prepare(query).bind(...values, ...roomId).run();
 
     return c.json({ success: true });
 

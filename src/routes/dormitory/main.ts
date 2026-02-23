@@ -94,37 +94,6 @@ main.get('/:id', async (c) => {
     }
 });
 
-main.patch('/:id/payment-note', async (c) => {
-    try {
-        const db = c.env.DB;
-        const body = await c.req.json();
-        const payload = c.get('jwtPayload');
-        const ownerId = payload.id;
-        const dormitoryId = c.req.param('id')
-        const { payment_note } = body;
-
-        if (!dormitoryId) {
-            return c.json({ success: false, message: "Missing dormitoryId" }, 400);
-        }
-
-        const result = await db.prepare(`
-            UPDATE dormitories 
-            SET payment_note = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND owner_id = ?
-        `)
-        .bind(payment_note, dormitoryId, ownerId)
-        .run();
-
-        if (result.meta.changes === 0) {
-            return c.json({ success: false, message: "หอพักไม่พบหรือคุณไม่มีสิทธิ์แก้ไข" }, 404);
-        }
-
-        return c.json({ success: true, message: "บันทึกหมายเหตุสำเร็จ" });
-    } catch (err: any) {
-        return c.json({ success: false, message: err.message }, 500);
-    }
-});
-
 main.get('/:id/stats', async (c) => {
     try {
         const db = c.env.DB;
