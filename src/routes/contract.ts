@@ -3,6 +3,6 @@ import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../utils/authMiddleware'
 
 
-const tennant = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
+const contracts = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
-tennant.use('/*', authMiddleware)
+contracts.use('/*', authMiddleware)

@@ -1,15 +1,10 @@
 import { Hono } from 'hono' 
-import { jwt } from 'hono/jwt'
+import { authMiddleware } from '../utils/authMiddleware'
+import { D1Database } from '@cloudflare/workers-types'
 
 const dormitories = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
-dormitories.use('/*', async (c, next) => {
-  const middleware = jwt({ 
-    secret: c.env.JWT_SECRET,
-    alg: 'HS256'
-  });
-  return middleware(c, next);
-});
+dormitories.use('/*', authMiddleware)
 
 dormitories.post('/add', async (c) => {
     try {
@@ -160,14 +155,13 @@ dormitories.get('/stats/:id', async (c) => {
             JOIN floors f ON r.floor_id = f.id
             WHERE f.dormitories_id = ?
         `).bind(dormitoryId, dormitoryId).first();
-
         return c.json({
             success: true,
             data: {
-                total: stats.total_rooms || 0,
-                vacant: stats.vacant_rooms || 0,
-                occupied: stats.occupied_rooms || 0,
-                pending: stats.pending_payments || 0
+                total: stats?.total_rooms ?? 0,
+                vacant: stats?.vacant_rooms ?? 0,
+                occupied: stats?.occupied_rooms ?? 0,
+                pending: stats?.pending_payments ?? 0
             }
         });
     } catch (err: any) {

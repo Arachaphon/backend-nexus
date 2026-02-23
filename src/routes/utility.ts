@@ -1,9 +1,11 @@
 import { Hono } from 'hono'
+import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../utils/authMiddleware'
 
 const utilities = new Hono<{ Bindings: { DB: D1Database } }>()
 
 utilities.use('/*', authMiddleware)
+
 utilities.post('/save-settings', async (c) => {
     try {
         const db = c.env.DB;

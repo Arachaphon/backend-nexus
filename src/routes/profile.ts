@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { hashPassword, verifyPassword } from '../utils/hash'
+import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../utils/authMiddleware'
 
 const profile = new Hono<{ Bindings: { DB: D1Database } }>()

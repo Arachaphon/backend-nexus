@@ -1,12 +1,10 @@
 import { Hono } from 'hono'
-import { jwt } from 'hono/jwt'
+import { D1Database } from '@cloudflare/workers-types'
+import { authMiddleware } from '../utils/authMiddleware'
 
 const banks = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
-banks.use('/*', async (c, next) => {
-    const middleware = jwt({ secret: c.env.JWT_SECRET, alg: 'HS256' });
-    return middleware(c, next);
-});
+banks.use('/*', authMiddleware)
 
 banks.post('/add', async (c) => {
     try {

@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { sign } from 'hono/jwt'
-import { hashPassword, verifyPassword } from '../utils/hash' 
+import { hashPassword, verifyPassword } from '../utils/hash'
+import { D1Database } from '@cloudflare/workers-types' 
 
 const auth = new Hono<{ Bindings: { DB: D1Database; JWT_SECRET: string } }>()
 

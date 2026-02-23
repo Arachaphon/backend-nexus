@@ -1,9 +1,11 @@
 import { Hono } from 'hono'
+import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../utils/authMiddleware'
 
 const floors = new Hono<{ Bindings: { DB: D1Database } }>()
 
 floors.use('/*', authMiddleware)
+
 floors.post('/floor-setup', async (c) => {
     try {
         const db = c.env.DB;
