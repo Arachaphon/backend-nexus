@@ -100,7 +100,8 @@ main.patch('/:id/payment-note', async (c) => {
         const body = await c.req.json();
         const payload = c.get('jwtPayload');
         const ownerId = payload.id;
-        const { dormitoryId, payment_note } = body;
+        const dormitoryId = c.req.param('id')
+        const { payment_note } = body;
 
         if (!dormitoryId) {
             return c.json({ success: false, message: "Missing dormitoryId" }, 400);
