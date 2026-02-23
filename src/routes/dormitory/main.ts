@@ -1,12 +1,12 @@
 import { Hono } from 'hono' 
-import { authMiddleware } from '../utils/authMiddleware'
+import { authMiddleware } from '../../utils/authMiddleware'
 import { D1Database } from '@cloudflare/workers-types'
 
-const dormitories = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
+const main = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
-dormitories.use('/*', authMiddleware)
+main.use('/*', authMiddleware)
 
-dormitories.post('/add', async (c) => {
+main.post('/', async (c) => {
     try {
         const db = c.env.DB;
         const body = await c.req.json();
@@ -39,7 +39,7 @@ dormitories.post('/add', async (c) => {
 });
 
 
-dormitories.get('/list', async (c) => {
+main.get('/', async (c) => {
     try {
         const db = c.env.DB;
         const payload = c.get('jwtPayload');
@@ -71,7 +71,7 @@ dormitories.get('/list', async (c) => {
     }
 });
 
-dormitories.get('/info/:id', async (c) => {
+main.get('/:id', async (c) => {
     try {
         const db = c.env.DB;
         const dormitoryId = c.req.param('id');
@@ -94,7 +94,7 @@ dormitories.get('/info/:id', async (c) => {
     }
 });
 
-dormitories.patch('/update-payment-note', async (c) => {
+main.patch('/:id/payment-note', async (c) => {
     try {
         const db = c.env.DB;
         const body = await c.req.json();
@@ -124,7 +124,7 @@ dormitories.patch('/update-payment-note', async (c) => {
     }
 });
 
-dormitories.get('/stats/:id', async (c) => {
+main.get('/:id/stats', async (c) => {
     try {
         const db = c.env.DB;
         const dormitoryId = c.req.param('id');
@@ -168,4 +168,4 @@ dormitories.get('/stats/:id', async (c) => {
         return c.json({ success: false, message: err.message }, 500);
     }
 });
-export default dormitories;
+export default main;

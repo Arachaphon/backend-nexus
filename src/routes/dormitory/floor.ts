@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { D1Database } from '@cloudflare/workers-types'
-import { authMiddleware } from '../utils/authMiddleware'
+import { authMiddleware } from '../../utils/authMiddleware'
 
 const floors = new Hono<{ Bindings: { DB: D1Database } }>()
 

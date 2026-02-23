@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { jwt } from 'hono/jwt'
 import { D1Database } from '@cloudflare/workers-types'
-import { authMiddleware } from '../utils/authMiddleware'
+import { authMiddleware } from '../../utils/authMiddleware'
 
 const rooms = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
