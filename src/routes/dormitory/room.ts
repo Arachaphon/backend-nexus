@@ -41,7 +41,24 @@ rooms.get('/info/:id', async (c) => {
   }
 });
 
-rooms.post('/room-setup', async (c) => {
+rooms.get('/:dormitoryId', async (c) => {
+    try {
+        const db = c.env.DB;
+        const dormitoryId = c.req.param('dormitoryId');
+        
+        const result = await db.prepare(`
+            SELECT r.* FROM rooms r
+            JOIN floors f ON r.floor_id = f.id
+            WHERE f.dormitories_id = ?
+        `).bind(dormitoryId).all();
+
+        return c.json({ success: true, data: result.results });
+    } catch (err: any) {
+        return c.json({ success: false, message: err.message }, 500);
+    }
+});
+
+rooms.post('/', async (c) => {
     try {
         const db = c.env.DB;
         const body = await c.req.json();
@@ -104,89 +121,56 @@ rooms.post('/room-setup', async (c) => {
     }
 });
 
-rooms.get('/get-rooms/:dormitoryId', async (c) => {
-    try {
-        const db = c.env.DB;
-        const dormitoryId = c.req.param('dormitoryId');
-        
-        const result = await db.prepare(`
-            SELECT r.* FROM rooms r
-            JOIN floors f ON r.floor_id = f.id
-            WHERE f.dormitories_id = ?
-        `).bind(dormitoryId).all();
+rooms.patch('/', async (c) => {
+  try {
+    const db = c.env.DB;
+    const body = await c.req.json();
+    const { roomIds, dormitoryId, price, status } = body;
 
-        return c.json({ success: true, data: result.results });
-    } catch (err: any) {
-        return c.json({ success: false, message: err.message }, 500);
+    if (!roomIds || roomIds.length === 0) {
+      return c.json({ success: false, message: 'กรุณาเลือกห้อง' }, 400);
     }
+
+    const placeholders = roomIds.map(() => '?').join(',');
+
+    const { count } = await db.prepare(`
+      SELECT COUNT(*) as count FROM rooms r
+      JOIN floors f ON r.floor_id = f.id
+      WHERE f.dormitories_id = ? AND r.id IN (${placeholders})
+    `).bind(dormitoryId, ...roomIds).first() as { count: number };
+
+    if (count !== roomIds.length) {
+      return c.json({ success: false, message: 'ข้อมูลไม่ถูกต้อง' }, 403);
+    }
+
+    // สร้าง dynamic update
+    let query = `UPDATE rooms SET `;
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (price !== undefined) {
+      updates.push(`current_rent_price = ?`);
+      values.push(price);
+    }
+
+    if (status !== undefined) {
+      updates.push(`status = ?`);
+      values.push(status);
+    }
+
+    if (updates.length === 0) {
+      return c.json({ success: false, message: 'ไม่มีข้อมูลให้อัปเดต' }, 400);
+    }
+
+    query += updates.join(', ') + ` WHERE id IN (${placeholders})`;
+
+    await db.prepare(query).bind(...values, ...roomIds).run();
+
+    return c.json({ success: true });
+
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500);
+  }
 });
 
-rooms.patch('/update-prices', async (c) => {
-    try {
-        const db = c.env.DB;
-        const body = await c.req.json(); 
-        const { roomId, price, dormitoryId } = body;
-
-        TODO:
-
-        if (!roomId || roomId.length === 0) {
-            return c.json({ success: false, message: 'กรุณาเลือกห้องที่ต้องการอัปเดต' }, 400);
-        }
-
-        const { count } = await db.prepare(`
-            SELECT COUNT(*) as count FROM rooms r
-            JOIN floors f ON r.floor_id = f.id
-            WHERE f.dormitories_id = ? AND r.id IN (${roomId.map(() => '?').join(',')})
-        `).bind(dormitoryId, ...roomId).first() as { count: number };
-
-        if (count !== roomId.length) {
-            return c.json({ success: false, message: 'พบข้อมูลห้องไม่ถูกต้อง หรือคุณไม่มีสิทธิ์เข้าถึง' }, 403);
-        }
-
-        const placeholders = roomId.map(() => '?').join(',');
-        await db.prepare(`
-            UPDATE rooms 
-            SET current_rent_price = ? 
-            WHERE id IN (${placeholders})
-        `).bind(price, ...roomId).run();
-
-        return c.json({ success: true, message: 'อัปเดตราคาสำเร็จ' });
-    } catch (err: any) {
-        return c.json({ success: false, message: err.message }, 500);
-    }
-});
-
-
-rooms.patch('/update-status', async (c) => {
-    try {
-        const db = c.env.DB;
-        const body = await c.req.json();
-        const { roomId, status, dormitoryId } = body; 
-
-        if (!roomId || roomId.length === 0) {
-            return c.json({ success: false, message: 'กรุณาเลือกห้องที่ต้องการ' }, 400);
-        }
-
-        const { count } = await db.prepare(`
-            SELECT COUNT(*) as count FROM rooms r
-            JOIN floors f ON r.floor_id = f.id
-            WHERE f.dormitories_id = ? AND r.id IN (${roomId.map(() => '?').join(',')})
-        `).bind(dormitoryId, ...roomId).first() as { count: number };
-
-        if (count !== roomId.length) {
-            return c.json({ success: false, message: 'ข้อมูลไม่ถูกต้อง' }, 403);
-        }
-
-        const placeholders = roomId.map(() => '?').join(',');
-        await db.prepare(`
-            UPDATE rooms 
-            SET status = ? 
-            WHERE id IN (${placeholders})
-        `).bind(status, ...roomId).run();
-
-        return c.json({ success: true, message: 'อัปเดตสถานะสำเร็จ' });
-    } catch (err: any) {
-        return c.json({ success: false, message: err.message }, 500);
-    }
-});
 export default rooms;

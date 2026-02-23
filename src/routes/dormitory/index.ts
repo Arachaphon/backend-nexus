@@ -9,7 +9,7 @@ import roomsRoutes from './room'
 const dormitory = new Hono()
 
 // route หลักของ dormitory
-dormitory.route('/', mainRoutes)
+dormitory.route('/main', mainRoutes)
 dormitory.route('/utilities', utilitiesRoutes)
 dormitory.route('/banks', banksRoutes)
 dormitory.route('/floors', floorsRoutes)

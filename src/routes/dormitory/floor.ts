@@ -6,7 +6,22 @@ const floors = new Hono<{ Bindings: { DB: D1Database } }>()
 
 floors.use('/*', authMiddleware)
 
-floors.post('/floor-setup', async (c) => {
+floors.get('/:dormitoryId', async (c) => {
+    try {
+        const db = c.env.DB;
+        const dormitoryId = c.req.param('dormitoryId');
+        
+        const result = await db.prepare(
+            `SELECT id, floor_number FROM floors WHERE dormitories_id = ? ORDER BY floor_number ASC`
+        ).bind(dormitoryId).all();
+
+        return c.json({ success: true, data: result.results });
+    } catch (err: any) {
+        return c.json({ success: false, message: err.message }, 500);
+    }
+});
+
+floors.post('/', async (c) => {
     try {
         const db = c.env.DB;
         const body = await c.req.json();
@@ -49,21 +64,6 @@ floors.post('/floor-setup', async (c) => {
         await db.batch(statements);
 
         return c.json({ success: true, message: 'บันทึกชั้นและสร้างห้องเริ่มต้นเรียบร้อย' }, 201);
-    } catch (err: any) {
-        return c.json({ success: false, message: err.message }, 500);
-    }
-});
-
-floors.get('/get-floors/:dormitoryId', async (c) => {
-    try {
-        const db = c.env.DB;
-        const dormitoryId = c.req.param('dormitoryId');
-        
-        const result = await db.prepare(
-            `SELECT id, floor_number FROM floors WHERE dormitories_id = ? ORDER BY floor_number ASC`
-        ).bind(dormitoryId).all();
-
-        return c.json({ success: true, data: result.results });
     } catch (err: any) {
         return c.json({ success: false, message: err.message }, 500);
     }

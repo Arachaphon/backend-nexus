@@ -6,7 +6,7 @@ const utilities = new Hono<{ Bindings: { DB: D1Database } }>()
 
 utilities.use('/*', authMiddleware)
 
-utilities.post('/save-settings', async (c) => {
+utilities.post('/', async (c) => {
     try {
         const db = c.env.DB;
         const body = await c.req.json();
