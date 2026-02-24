@@ -1,12 +1,13 @@
 import { Hono } from 'hono'
 import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../../utils/authMiddleware'
+import { requireRole } from '../../utils/roleMiddleware'
 
 const utilities = new Hono<{ Bindings: { DB: D1Database } }>()
 
 utilities.use('/*', authMiddleware)
 
-utilities.post('/', async (c) => {
+utilities.post('/', requireRole(['owner']), async (c) => {
     try {
         const db = c.env.DB;
         const body = await c.req.json();

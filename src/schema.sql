@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   email TEXT NOT NULL UNIQUE,
   phone_number TEXT,
   password TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'owner' CHECK(role IN ('owner','manager')),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

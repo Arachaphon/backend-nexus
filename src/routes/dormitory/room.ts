@@ -1,20 +1,14 @@
 import { Hono } from 'hono'
-import { jwt } from 'hono/jwt'
-import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../../utils/authMiddleware'
+import { requireRole } from '../../utils/roleMiddleware'
+import { D1Database } from '@cloudflare/workers-types'
+
 
 const rooms = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
-rooms.use('/*', async (c, next) => {
-  const middleware = jwt({
-    secret: c.env.JWT_SECRET,
-    alg: 'HS256'
-  });
+rooms.use('*', authMiddleware)
 
-  return middleware(c, next);
-});
-
-rooms.get('/:id', async (c) => {
+rooms.get('/:id', requireRole(['owner', 'manager']), async (c) => {
   try {
     const db = c.env.DB;
     const roomId = c.req.param('id');
@@ -41,7 +35,7 @@ rooms.get('/:id', async (c) => {
   }
 });
 
-rooms.get('/:dormitoryId', async (c) => {
+rooms.get('/:dormitoryId', requireRole(['owner', 'manager']), async (c) => {
     try {
         const db = c.env.DB;
         const dormitoryId = c.req.param('dormitoryId');
@@ -58,7 +52,7 @@ rooms.get('/:dormitoryId', async (c) => {
     }
 });
 
-rooms.post('/', async (c) => {
+rooms.post('/', requireRole(['owner']), async (c) => {
     try {
         const db = c.env.DB;
         const body = await c.req.json();
@@ -121,7 +115,7 @@ rooms.post('/', async (c) => {
     }
 });
 
-rooms.patch('/', async (c) => {
+rooms.patch('/', requireRole(['owner']), async (c) => {
   try {
     const db = c.env.DB;
     const body = await c.req.json();

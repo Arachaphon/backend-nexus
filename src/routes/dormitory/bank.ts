@@ -1,12 +1,13 @@
 import { Hono } from 'hono'
 import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../../utils/authMiddleware'
+import { requireRole } from '../../utils/roleMiddleware'
 
 const banks = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
 banks.use('/*', authMiddleware)
 
-banks.get('/:dormitoryId', async (c) => {
+banks.get('/:dormitoryId', requireRole(['owner', 'manager']),  async (c) => {
     try {
         const db = c.env.DB;
         const dormId = c.req.param('dormitoryId');
@@ -30,7 +31,7 @@ banks.get('/:dormitoryId', async (c) => {
     }
 });
 
-banks.post('/', async (c) => {
+banks.post('/', requireRole(['owner']), async (c) => {
     try {
         const db = c.env.DB;
         const body = await c.req.json();
@@ -64,7 +65,7 @@ banks.post('/', async (c) => {
     }
 });
 
-banks.delete('/:id', async (c) => {
+banks.delete('/:id', requireRole(['owner']), async (c) => {
     try {
         const db = c.env.DB;
         const bankId = c.req.param('id');
@@ -81,7 +82,7 @@ banks.delete('/:id', async (c) => {
 });
 
 
-banks.patch('/payment-note/:dormitoryId', async (c) => {
+banks.patch('/payment-note/:dormitoryId', requireRole(['owner']), async (c) => {
     try {
         const db = c.env.DB;
         const body = await c.req.json();

@@ -1,12 +1,13 @@
 import { Hono } from 'hono'
 import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../../utils/authMiddleware'
+import { requireRole } from '../../utils/roleMiddleware'
 
 const floors = new Hono<{ Bindings: { DB: D1Database } }>()
 
 floors.use('/*', authMiddleware)
 
-floors.get('/:dormitoryId', async (c) => {
+floors.get('/:dormitoryId', requireRole(['owner', 'manager']), async (c) => {
     try {
         const db = c.env.DB;
         const dormitoryId = c.req.param('dormitoryId');
@@ -21,7 +22,7 @@ floors.get('/:dormitoryId', async (c) => {
     }
 });
 
-floors.post('/', async (c) => {
+floors.post('/', requireRole(['owner']), async (c) => {
     try {
         const db = c.env.DB;
         const body = await c.req.json();
@@ -69,5 +70,4 @@ floors.post('/', async (c) => {
     }
 });
 
-//floors.patch('/update-floor/:id') --> room_count
 export default floors;

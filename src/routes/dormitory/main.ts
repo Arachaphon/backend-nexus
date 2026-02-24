@@ -1,45 +1,13 @@
 import { Hono } from 'hono' 
 import { authMiddleware } from '../../utils/authMiddleware'
+import { requireRole } from '../../utils/roleMiddleware'
 import { D1Database } from '@cloudflare/workers-types'
 
 const main = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
-main.use('/*', authMiddleware)
+main.use('*', authMiddleware)
 
-main.post('/', async (c) => {
-    try {
-        const db = c.env.DB;
-        const body = await c.req.json();
-        const payload = c.get('jwtPayload');
-        const ownerIdFromToken = payload.id; 
-
-        const dormitoryId = crypto.randomUUID();
-
-        await db.prepare(`
-            INSERT INTO dormitories (
-                id, owner_id, name, address, phone_number, tax_id, due_date, fine_per_day
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `)
-        .bind(
-            dormitoryId, 
-            ownerIdFromToken,
-            body.name, 
-            body.address, 
-            body.phone_number, 
-            body.tax_id || null,
-            body.due_date, 
-            body.fine_per_day
-        )
-        .run();
-
-        return c.json({ success: true, dormitory_id: dormitoryId }, 201);
-    } catch (err: any) {
-        return c.json({ success: false, message: err.message }, 500);
-    }
-});
-
-
-main.get('/', async (c) => {
+main.get('/', requireRole(['owner', 'manager']), async (c) => {
     try {
         const db = c.env.DB;
         const payload = c.get('jwtPayload');
@@ -71,7 +39,7 @@ main.get('/', async (c) => {
     }
 });
 
-main.get('/:id', async (c) => {
+main.get('/:id', requireRole(['owner', 'manager']), async (c) => {
     try {
         const db = c.env.DB;
         const dormitoryId = c.req.param('id');
@@ -94,7 +62,7 @@ main.get('/:id', async (c) => {
     }
 });
 
-main.get('/:id/stats', async (c) => {
+main.get('/:id/stats', requireRole(['owner', 'manager']), async (c) => {
     try {
         const db = c.env.DB;
         const dormitoryId = c.req.param('id');
@@ -134,6 +102,38 @@ main.get('/:id/stats', async (c) => {
                 pending: stats?.pending_payments ?? 0
             }
         });
+    } catch (err: any) {
+        return c.json({ success: false, message: err.message }, 500);
+    }
+});
+
+main.post('/', requireRole(['owner']), async (c) => {
+    try {
+        const db = c.env.DB;
+        const body = await c.req.json();
+        const payload = c.get('jwtPayload');
+        const ownerIdFromToken = payload.id; 
+
+        const dormitoryId = crypto.randomUUID();
+
+        await db.prepare(`
+            INSERT INTO dormitories (
+                id, owner_id, name, address, phone_number, tax_id, due_date, fine_per_day
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `)
+        .bind(
+            dormitoryId, 
+            ownerIdFromToken,
+            body.name, 
+            body.address, 
+            body.phone_number, 
+            body.tax_id || null,
+            body.due_date, 
+            body.fine_per_day
+        )
+        .run();
+
+        return c.json({ success: true, dormitory_id: dormitoryId }, 201);
     } catch (err: any) {
         return c.json({ success: false, message: err.message }, 500);
     }
