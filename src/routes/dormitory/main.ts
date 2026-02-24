@@ -11,7 +11,7 @@ main.get('/', requireRole(['owner', 'manager']), async (c) => {
     try {
         const db = c.env.DB;
         const payload = c.get('jwtPayload');
-        const ownerId = payload.id;
+        const ownerId = payload.userId;
 
         const { results } = await db.prepare(`
             SELECT 
@@ -44,7 +44,7 @@ main.get('/:id', requireRole(['owner', 'manager']), async (c) => {
         const db = c.env.DB;
         const dormitoryId = c.req.param('id');
         const payload = c.get('jwtPayload');
-        const ownerId = payload.id;
+        const ownerId = payload.userId;
 
         const dormitory = await db.prepare(`
             SELECT * FROM dormitories WHERE id = ? AND owner_id = ?
@@ -67,7 +67,7 @@ main.get('/:id/stats', requireRole(['owner', 'manager']), async (c) => {
         const db = c.env.DB;
         const dormitoryId = c.req.param('id');
         const payload = c.get('jwtPayload');
-        const ownerId = payload.id;
+        const ownerId = payload.userId;
 
         const dormitory = await db.prepare(`
             SELECT id FROM dormitories WHERE id = ? AND owner_id = ?
@@ -112,7 +112,7 @@ main.post('/', requireRole(['owner']), async (c) => {
         const db = c.env.DB;
         const body = await c.req.json();
         const payload = c.get('jwtPayload');
-        const ownerIdFromToken = payload.id; 
+        const ownerIdFromToken = payload.userId; 
 
         const dormitoryId = crypto.randomUUID();
 
