@@ -5,7 +5,7 @@ import { D1Database } from '@cloudflare/workers-types'
 
 const main = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
-main.use('*', authMiddleware)
+main.use('/*', authMiddleware)
 
 main.get('/', requireRole(['owner', 'manager']), async (c) => {
     try {
