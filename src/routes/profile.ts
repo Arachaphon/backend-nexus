@@ -27,7 +27,7 @@ profile.get('/', async (c) => {
 profile.patch('/', async (c) => {
   try {
     const payload = c.get('jwtPayload');
-    const userId = payload.id;
+    const userId = payload.userId;
 
     const { name, email } = await c.req.json();
     const db = c.env.DB;
@@ -47,7 +47,7 @@ profile.patch('/', async (c) => {
 profile.patch('/password', async (c) => {
   try {
     const payload = c.get('jwtPayload');
-    const userId = payload.id;
+    const userId = payload.userId;
 
     const { currentPassword, newPassword } = await c.req.json();
     const db = c.env.DB;

@@ -1,3 +1,11 @@
+/*
+NO ACTION	ห้ามลบ parent ถ้ายังมี child
+SET NULL	ลบ parent → child กลายเป็น NULL
+CASCADE	ลบ parent → child ถูกลบตาม
+DROP TABLE table_name;
+ALTER TABLE table_name
+ADD COLUMN column_name DATA_TYPE;
+*/
 -- 1. Profiles 
 CREATE TABLE IF NOT EXISTS profiles (
   id TEXT PRIMARY KEY,
@@ -184,9 +192,3 @@ CREATE INDEX IF NOT EXISTS idx_meter_readings_room_id ON meter_readings(room_id)
 CREATE INDEX IF NOT EXISTS idx_bills_room_id ON bills(room_id);
 CREATE INDEX IF NOT EXISTS idx_bills_contract_id ON bills(contract_id);
 
-/*
-NO ACTION	ห้ามลบ parent ถ้ายังมี child
-SET NULL	ลบ parent → child กลายเป็น NULL
-CASCADE	ลบ parent → child ถูกลบตาม
-DROP TABLE table_name;
-*/

@@ -46,7 +46,7 @@ auth.post('/login', async (c) => {
         }
 
         const payload = {
-            userId: user!.id,      
+            userId: user!.userid,      
             username: user!.username,
             role: user!.role,      
             exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
