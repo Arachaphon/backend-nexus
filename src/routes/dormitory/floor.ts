@@ -2,15 +2,18 @@ import { Hono } from 'hono'
 import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../../utils/authMiddleware'
 import { requireRole } from '../../utils/roleMiddleware'
-
+import { requireDormitoryAccess } from '../../utils/dormitoryAccess'
 const floors = new Hono<{ Bindings: { DB: D1Database } }>()
 
 floors.use('/*', authMiddleware)
 
-floors.get('/:dormitoryId', requireRole(['owner', 'manager']), async (c) => {
+floors.get('/:id', 
+    requireDormitoryAccess,
+    requireRole(['owner', 'manager']), 
+    async (c) => {
     try {
         const db = c.env.DB;
-        const dormitoryId = c.req.param('dormitoryId');
+        const dormitoryId = c.req.param('id');
         
         const result = await db.prepare(
             `SELECT id, floor_number FROM floors WHERE dormitories_id = ? ORDER BY floor_number ASC`
@@ -22,52 +25,71 @@ floors.get('/:dormitoryId', requireRole(['owner', 'manager']), async (c) => {
     }
 });
 
-floors.post('/', requireRole(['owner']), async (c) => {
-    try {
-        const db = c.env.DB;
-        const body = await c.req.json();
-        const { dormitoryId, floors: floorList } = body;
+floors.post('/:id',
+    requireDormitoryAccess,
+    requireRole(['owner']),
+    async (c) => {
 
-        if (!dormitoryId || !floorList || !Array.isArray(floorList)) {
-            return c.json({ success: false, message: "ข้อมูลไม่ครบถ้วน" }, 400);
-        }
+    const db = c.env.DB;
+    const dormitoryId = c.req.param('id');
+    const { floors: floorList } = await c.req.json();
 
-        const statements = [];
+    if (!floorList || !Array.isArray(floorList)) {
+        return c.json({ success:false, message:'ข้อมูลไม่ครบ' },400);
+    }
 
-        statements.push(db.prepare(`
-            DELETE FROM rooms WHERE floor_id IN (SELECT id FROM floors WHERE dormitories_id = ?)
-        `).bind(dormitoryId));
+    const statements = [];
 
-        statements.push(db.prepare(`
-            DELETE FROM floors WHERE dormitories_id = ?
-        `).bind(dormitoryId));
+    statements.push(db.prepare(`
+        DELETE FROM rooms 
+        WHERE floor_id IN (
+            SELECT id FROM floors WHERE dormitories_id = ?
+        )
+    `).bind(dormitoryId));
 
-        for (const f of floorList) {
-            const floorId = crypto.randomUUID();
-            
+    statements.push(db.prepare(`
+        DELETE FROM floors WHERE dormitories_id = ?
+    `).bind(dormitoryId));
+
+    for (const f of floorList) {
+
+        const floorId = crypto.randomUUID();
+
+        statements.push(
+            db.prepare(`
+                INSERT INTO floors (id, dormitories_id, floor_number, room_count, created_at)
+                VALUES (?, ?, ?, ?, ?)
+            `).bind(
+                floorId,
+                dormitoryId,
+                f.floor_number,
+                f.room_count,
+                new Date().toISOString()
+            )
+        );
+
+        for (let i = 1; i <= f.room_count; i++) {
+
+            const roomNumber =
+                `${f.floor_number}${i.toString().padStart(2,'0')}`;
+
             statements.push(
                 db.prepare(`
-                    INSERT INTO floors (id, dormitories_id, floor_number, room_count, created_at)
-                    VALUES (?, ?, ?, ?, ?)
-                `).bind(floorId, dormitoryId, f.floor_number, f.room_count, new Date().toISOString())
+                    INSERT INTO rooms
+                    (id, floor_id, room_number, is_active, status, current_rent_price)
+                    VALUES (?, ?, ?, 1, 'vacant', 0)
+                `).bind(
+                    crypto.randomUUID(),
+                    floorId,
+                    roomNumber
+                )
             );
-
-            for (let i = 1; i <= f.room_count; i++) {
-                const roomNumber = `${f.floor_number}${i.toString().padStart(2, '0')}`;
-                statements.push(
-                    db.prepare(`
-                        INSERT INTO rooms (id, floor_id, room_number, is_active, status, current_rent_price)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    `).bind(crypto.randomUUID(), floorId, roomNumber, 1, 'vacant', 0) 
-                );
-            }
         }
-        await db.batch(statements);
-
-        return c.json({ success: true, message: 'บันทึกชั้นและสร้างห้องเริ่มต้นเรียบร้อย' }, 201);
-    } catch (err: any) {
-        return c.json({ success: false, message: err.message }, 500);
     }
+
+    await db.batch(statements);
+
+    return c.json({ success:true },201);
 });
 
 export default floors;

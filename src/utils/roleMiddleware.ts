@@ -1,18 +1,14 @@
-// src/utils/roleMiddleware.ts
 import { Context, Next } from 'hono'
 
-export function requireRole(roles: ('owner' | 'manager')[]) {
-    return async (c: Context, next: Next) => {
-        const user = c.get('user')
+export function requireRole(roles: ('owner'|'manager')[]) {
+  return async (c: Context, next: Next) => {
 
-        if (!user) {
-            return c.json({ error: 'Unauthorized' }, 401)
-        }
+    const dormRole = c.get('dormRole')
 
-        if (!roles.includes(user.role)) {
-            return c.json({ error: 'Forbidden: ไม่มีสิทธิ์ใช้งานส่วนนี้' }, 403)
-        }
-
-        await next()
+    if (!roles.includes(dormRole)) {
+      return c.json({ error: 'Forbidden' }, 403)
     }
+
+    await next()
+  }
 }

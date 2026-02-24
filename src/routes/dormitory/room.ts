@@ -2,165 +2,245 @@ import { Hono } from 'hono'
 import { authMiddleware } from '../../utils/authMiddleware'
 import { requireRole } from '../../utils/roleMiddleware'
 import { D1Database } from '@cloudflare/workers-types'
-
+import { requireDormitoryAccess } from '../../utils/dormitoryAccess'
 
 const rooms = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
 rooms.use('*', authMiddleware)
 
-rooms.get('/:id', requireRole(['owner', 'manager']), async (c) => {
-  try {
-    const db = c.env.DB;
-    const roomId = c.req.param('id');
-    const payload = c.get('jwtPayload');
-    const ownerId = payload.id;
+/* =========================================================
+   GET: ห้องทั้งหมดของหอ
+========================================================= */
+rooms.get('/:dormitoryId',
+  requireDormitoryAccess,
+  requireRole(['owner','manager']),
+  async (c) => {
+
+    const db = c.env.DB
+    const dormitoryId = c.req.param('dormitoryId')
+
+    const { results } = await db.prepare(`
+      SELECT r.*
+      FROM rooms r
+      JOIN floors f ON r.floor_id = f.id
+      WHERE f.dormitories_id = ?
+    `).bind(dormitoryId).all()
+
+    return c.json({ success:true, data:results })
+})
+
+/* =========================================================
+   GET: ห้องเดียว
+========================================================= */
+rooms.get('/:dormitoryId/:roomId',
+  requireDormitoryAccess,
+  requireRole(['owner','manager']),
+  async (c) => {
+
+    const db = c.env.DB
+    const dormitoryId = c.req.param('dormitoryId')
+    const roomId = c.req.param('roomId')
 
     const room = await db.prepare(`
       SELECT r.*
       FROM rooms r
       JOIN floors f ON r.floor_id = f.id
-      JOIN dormitories d ON f.dormitories_id = d.id
-      WHERE r.id = ? AND d.owner_id = ?
-    `)
-    .bind(roomId, ownerId)
-    .first();
+      WHERE r.id = ? AND f.dormitories_id = ?
+    `).bind(roomId, dormitoryId).first()
 
     if (!room) {
-      return c.json({ success: false, message: "ไม่พบข้อมูลห้อง" }, 404);
+      return c.json({ success:false, message:'ไม่พบข้อมูลห้อง' },404)
     }
 
-    return c.json(room);
-  } catch (err: any) {
-    return c.json({ success: false, message: err.message }, 500);
-  }
-});
+    return c.json({ success:true, data:room })
+})
 
-rooms.get('/:dormitoryId', requireRole(['owner', 'manager']), async (c) => {
+/* =========================================================
+   POST: สร้าง/แก้ไข floor + room
+========================================================= */
+rooms.post('/:dormitoryId',
+  requireDormitoryAccess,
+  requireRole(['owner']),
+  async (c) => {
+
+    const db = c.env.DB
+    const dormitoryId = c.req.param('dormitoryId')
+
+    let body
     try {
-        const db = c.env.DB;
-        const dormitoryId = c.req.param('dormitoryId');
-        
-        const result = await db.prepare(`
-            SELECT r.* FROM rooms r
+      body = await c.req.json()
+    } catch {
+      return c.json({ success:false, message:'Invalid JSON body' },400)
+    }
+
+    const { floors } = body
+
+    if (!Array.isArray(floors)) {
+      return c.json({ success:false, message:'Floors must be array' },400)
+    }
+
+    const floorStatements: any[] = []
+    const roomStatements: any[] = []
+
+    try {
+
+      for (const f of floors) {
+
+        if (
+          typeof f.id !== 'string' ||
+          typeof f.floorNumber !== 'number' ||
+          !Array.isArray(f.rooms)
+        ) {
+          return c.json({ success:false, message:'Invalid floor structure' },400)
+        }
+
+        const existingFloor = await db.prepare(`
+          SELECT dormitories_id FROM floors WHERE id = ?
+        `).bind(f.id).first()
+
+        if (existingFloor && existingFloor.dormitories_id !== dormitoryId) {
+          return c.json({ success:false, message:'Forbidden floor update' },403)
+        }
+
+        floorStatements.push(
+          db.prepare(`
+            INSERT INTO floors (id, dormitories_id, floor_number, room_count)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              floor_number = excluded.floor_number,
+              room_count = excluded.room_count
+          `).bind(
+            f.id,
+            dormitoryId,
+            f.floorNumber,
+            f.rooms.length
+          )
+        )
+
+        for (const r of f.rooms) {
+
+          if (
+            typeof r.id !== 'string' ||
+            typeof r.number !== 'string'
+          ) {
+            return c.json({ success:false, message:'Invalid room structure' },400)
+          }
+
+          const isActive =
+            r.isActive === true ||
+            r.isActive === 1 ||
+            r.isActive === '1'
+
+          const existingRoom = await db.prepare(`
+            SELECT f.dormitories_id
+            FROM rooms r
             JOIN floors f ON r.floor_id = f.id
-            WHERE f.dormitories_id = ?
-        `).bind(dormitoryId).all();
+            WHERE r.id = ?
+          `).bind(r.id).first()
 
-        return c.json({ success: true, data: result.results });
-    } catch (err: any) {
-        return c.json({ success: false, message: err.message }, 500);
+          if (existingRoom && existingRoom.dormitories_id !== dormitoryId) {
+            return c.json({ success:false, message:'Forbidden room update' },403)
+          }
+
+          roomStatements.push(
+            db.prepare(`
+              INSERT INTO rooms
+              (id, floor_id, room_number, is_active, status, current_rent_price)
+              VALUES (?, ?, ?, ?, ?, ?)
+              ON CONFLICT(id) DO UPDATE SET
+                room_number = excluded.room_number,
+                is_active = excluded.is_active
+            `).bind(
+              r.id,
+              f.id,
+              r.number,
+              isActive ? 1 : 0,
+              'vacant',
+              0
+            )
+          )
+        }
+      }
+
+      await db.batch(floorStatements)
+      await db.batch(roomStatements)
+
+      return c.json({ success:true })
+
+    } catch (err) {
+      console.error("ROOM SAVE ERROR:", err)
+      return c.json({ success:false, message:String(err) },500)
     }
-});
+  }
+)
 
-rooms.post('/', requireRole(['owner']), async (c) => {
-    try {
-        const db = c.env.DB;
-        const body = await c.req.json();
-        const { dormitoryId, floors: floorList } = body;
+/* =========================================================
+   PATCH: อัปเดตราคา / สถานะ
+========================================================= */
+rooms.patch('/:dormitoryId',
+  requireDormitoryAccess,
+  requireRole(['owner']),
+  async (c) => {
 
-        const statements = [];
+    const db = c.env.DB
+    const dormitoryId = c.req.param('dormitoryId')
 
-        const validRoomIds = floorList.flatMap((f: any) => f.rooms.map((r: any) => r.id));
-        const validFloorIds = floorList.map((f: any) => f.id);
+    const { roomIds, price, status } = await c.req.json()
 
-        if (validRoomIds.length > 0) {
-            const placeholders = validRoomIds.map(() => '?').join(',');
-            statements.push(
-                db.prepare(`
-                    DELETE FROM rooms 
-                    WHERE floor_id IN (SELECT id FROM floors WHERE dormitories_id = ?)
-                    AND id NOT IN (${placeholders})
-                `).bind(dormitoryId, ...validRoomIds)
-            );
-        }
-
-        if (validFloorIds.length > 0) {
-            const floorPlaceholders = validFloorIds.map(() => '?').join(',');
-            statements.push(
-                db.prepare(`
-                    DELETE FROM floors 
-                    WHERE dormitories_id = ? AND id NOT IN (${floorPlaceholders})
-                `).bind(dormitoryId, ...validFloorIds)
-            );
-        }
-
-        for (const f of floorList) {
-            statements.push(
-                db.prepare(`
-                    INSERT INTO floors (id, dormitories_id, floor_number, room_count)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT(id) DO UPDATE SET 
-                        floor_number = excluded.floor_number, 
-                        room_count = excluded.room_count
-                `).bind(f.id, dormitoryId, f.floorNumber, f.rooms.length)
-            );
-
-            for (const r of f.rooms) {
-                statements.push(
-                    db.prepare(`
-                        INSERT INTO rooms (id, floor_id, room_number, is_active, status, current_rent_price)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                        ON CONFLICT(id) DO UPDATE SET 
-                            room_number = excluded.room_number,
-                            is_active = excluded.is_active
-                    `).bind(r.id, f.id, r.number, r.isActive ? 1 : 0, 'vacant', 0)
-                );
-            }
-        }
-        
-        await db.batch(statements);
-        return c.json({ success: true, message: 'บันทึกข้อมูลสำเร็จ' });
-    } catch (err: any) {
-        return c.json({ success: false, message: err.message }, 500);
+    if (!Array.isArray(roomIds) || roomIds.length === 0) {
+      return c.json({ success:false },400)
     }
-});
 
-rooms.patch('/', requireRole(['owner']), async (c) => {
-  try {
-    const db = c.env.DB;
-    const body = await c.req.json();
-    const { roomId, dormitoryId, price, status } = body
+    const placeholders = roomIds.map(() => '?').join(',')
 
-    const placeholders = roomId.map(() => '?').join(',');
-
-    const { count } = await db.prepare(`
-      SELECT COUNT(*) as count FROM rooms r
+    const row = await db.prepare(`
+      SELECT COUNT(*) as count
+      FROM rooms r
       JOIN floors f ON r.floor_id = f.id
-      WHERE f.dormitories_id = ? AND r.id IN (${placeholders})
-    `).bind(dormitoryId, ...roomId).first() as { count: number };
+      WHERE f.dormitories_id = ?
+      AND r.id IN (${placeholders})
+    `).bind(dormitoryId, ...roomIds).first()
 
-    if (count !== roomId.length) {
-      return c.json({ success: false, message: 'ข้อมูลไม่ถูกต้อง' }, 403);
+    if (!row || row.count !== roomIds.length) {
+      return c.json({ success:false, message:'Forbidden' },403)
     }
 
-    // สร้าง dynamic update
-    let query = `UPDATE rooms SET `;
-    const updates: string[] = [];
-    const values: any[] = [];
+    const updates: string[] = []
+    const values: any[] = []
 
     if (price !== undefined) {
-      updates.push(`current_rent_price = ?`);
-      values.push(price);
+      const num = Number(price)
+      if (isNaN(num)) {
+        return c.json({ success:false },400)
+      }
+      updates.push('current_rent_price = ?')
+      values.push(num)
     }
 
+    const validStatus = ['vacant','occupied','maintenance']
+
     if (status !== undefined) {
-      updates.push(`status = ?`);
-      values.push(status);
+      if (!validStatus.includes(status)) {
+        return c.json({ success:false, message:'Invalid status' },400)
+      }
+      updates.push('status = ?')
+      values.push(status)
     }
 
     if (updates.length === 0) {
-      return c.json({ success: false, message: 'ไม่มีข้อมูลให้อัปเดต' }, 400);
+      return c.json({ success:false },400)
     }
 
-    query += updates.join(', ') + ` WHERE id IN (${placeholders})`;
+    const query = `
+      UPDATE rooms
+      SET ${updates.join(', ')}
+      WHERE id IN (${placeholders})
+    `
 
-    await db.prepare(query).bind(...values, ...roomId).run();
+    await db.prepare(query).bind(...values, ...roomIds).run()
 
-    return c.json({ success: true });
-
-  } catch (err: any) {
-    return c.json({ success: false, message: err.message }, 500);
+    return c.json({ success:true })
   }
-});
+)
 
-export default rooms;
+export default rooms

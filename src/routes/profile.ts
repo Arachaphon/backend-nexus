@@ -7,74 +7,82 @@ const profile = new Hono<{ Bindings: { DB: D1Database } }>()
 
 profile.use('/*', authMiddleware)
 
+/**
+ * GET MY PROFILE
+ */
 profile.get('/', async (c) => {
-  try {
-    const payload = c.get('jwtPayload');
-    const userId = payload.id;
 
-    const db = c.env.DB;
-    const user = await db.prepare(
-      "SELECT username, email FROM profiles WHERE id = ?"
-    ).bind(userId).first();
+  const payload = c.get('jwtPayload')
+  const userId = payload.userId
+  const db = c.env.DB
 
-    return c.json(user);
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500);
-  }
-});
+  const user = await db.prepare(`
+    SELECT username, email, phone_number
+    FROM profiles
+    WHERE id = ?
+  `).bind(userId).first()
 
-// 2. UPDATE Profile (แก้ไขข้อมูล)
+  return c.json({ success: true, data: user })
+})
+
+/**
+ * UPDATE PROFILE
+ */
 profile.patch('/', async (c) => {
-  try {
-    const payload = c.get('jwtPayload');
-    const userId = payload.userId;
 
-    const { name, email } = await c.req.json();
-    const db = c.env.DB;
+  const payload = c.get('jwtPayload')
+  const userId = payload.userId
+  const { username, email } = await c.req.json()
+  const db = c.env.DB
 
-    await db.prepare(
-      "UPDATE profiles SET username = ?, email = ? WHERE id = ?"
-    ).bind(name, email, userId).run();
-
-    return c.json({ success: true });
-
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+  if (!username || !email) {
+    return c.json({ success: false }, 400)
   }
-});
 
-// 3. UPDATE Password (เปลี่ยนรหัสผ่าน)
+  await db.prepare(`
+    UPDATE profiles
+    SET username = ?, email = ?
+    WHERE id = ?
+  `).bind(username, email, userId).run()
+
+  return c.json({ success: true })
+})
+
+/**
+ * CHANGE PASSWORD
+ */
 profile.patch('/password', async (c) => {
-  try {
-    const payload = c.get('jwtPayload');
-    const userId = payload.userId;
 
-    const { currentPassword, newPassword } = await c.req.json();
-    const db = c.env.DB;
+  const payload = c.get('jwtPayload')
+  const userId = payload.userId
+  const { currentPassword, newPassword } = await c.req.json()
+  const db = c.env.DB
 
-    const user = await db.prepare(
-      "SELECT password FROM profiles WHERE id = ?"
-    ).bind(userId).first();
-
-    const isValid = user
-      ? await verifyPassword(currentPassword, user.password as string)
-      : false;
-
-    if (!isValid) {
-      return c.json({ success: false, message: "รหัสผ่านปัจจุบันไม่ถูกต้อง" }, 401);
-    }
-
-    const hashed = await hashPassword(newPassword);
-
-    await db.prepare(
-      "UPDATE profiles SET password = ? WHERE id = ?"
-    ).bind(hashed, userId).run();
-
-    return c.json({ success: true });
-
-  } catch (err: any) {
-    return c.json({ success: false, message: err.message }, 500);
+  if (!currentPassword || !newPassword) {
+    return c.json({ success: false }, 400)
   }
-});
 
-export default profile;
+  const user = await db.prepare(`
+    SELECT password FROM profiles WHERE id = ?
+  `).bind(userId).first()
+
+  if (!user) {
+    return c.json({ success: false }, 404)
+  }
+
+  const valid = await verifyPassword(currentPassword, user.password as string)
+
+  if (!valid) {
+    return c.json({ success: false }, 401)
+  }
+
+  const hashed = await hashPassword(newPassword)
+
+  await db.prepare(`
+    UPDATE profiles SET password = ? WHERE id = ?
+  `).bind(hashed, userId).run()
+
+  return c.json({ success: true })
+})
+
+export default profile

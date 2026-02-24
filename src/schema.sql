@@ -7,20 +7,18 @@ ALTER TABLE table_name
 ADD COLUMN column_name DATA_TYPE;
 */
 -- 1. Profiles 
-CREATE TABLE IF NOT EXISTS profiles (
+CREATE TABLE profiles (
   id TEXT PRIMARY KEY,
   username TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE,
   phone_number TEXT,
   password TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'owner' CHECK(role IN ('owner','manager')),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 2. Dormitories
-CREATE TABLE IF NOT EXISTS dormitories (
+CREATE TABLE dormitories (
     id TEXT PRIMARY KEY,
-    owner_id TEXT NOT NULL,
     name TEXT NOT NULL,
     address TEXT NOT NULL,
     phone_number TEXT NOT NULL,
@@ -29,8 +27,20 @@ CREATE TABLE IF NOT EXISTS dormitories (
     fine_per_day REAL NOT NULL,
     payment_note TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (owner_id) REFERENCES profiles(id) ON DELETE CASCADE
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE dormitory_users (
+    id TEXT PRIMARY KEY,
+    dormitory_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('owner','manager')),
+    assigned_by TEXT,
+    assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (dormitory_id) REFERENCES dormitories(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE,
+    FOREIGN KEY (assigned_by) REFERENCES profiles(id) ON DELETE SET NULL
 );
 
 -- 3. Water Rate Templates
@@ -183,6 +193,7 @@ CREATE TABLE IF NOT EXISTS bank_accounts (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (dormitories_id) REFERENCES dormitories(id) ON DELETE CASCADE
 );
+
 
 CREATE INDEX IF NOT EXISTS idx_contracts_room_id ON contracts(room_id);
 CREATE INDEX IF NOT EXISTS idx_contract_tenants_contract_id ON contract_tenants(contract_id);

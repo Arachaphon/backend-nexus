@@ -1,13 +1,14 @@
 import { Hono } from 'hono' 
 import { authMiddleware } from '../../utils/authMiddleware'
 import { requireRole } from '../../utils/roleMiddleware'
+import { requireDormitoryAccess } from '../../utils/dormitoryAccess'
 import { D1Database } from '@cloudflare/workers-types'
 
 const main = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
 main.use('/*', authMiddleware)
 
-main.get('/', requireRole(['owner', 'manager']), async (c) => {
+main.get('/', async (c) => {
     try {
         const db = c.env.DB;
         const payload = c.get('jwtPayload');
@@ -30,7 +31,8 @@ main.get('/', requireRole(['owner', 'manager']), async (c) => {
                     WHERE f.dormitories_id = d.id AND r.status = 'vacant'
                 ) as vacant_rooms
             FROM dormitories d
-            WHERE d.owner_id = ?
+            JOIN dormitory_users du ON du.dormitory_id = d.id
+            WHERE du.user_id = ?
         `).bind(ownerId).all();
 
         return c.json({ success: true, data: results });
@@ -39,7 +41,10 @@ main.get('/', requireRole(['owner', 'manager']), async (c) => {
     }
 });
 
-main.get('/:id', requireRole(['owner', 'manager']), async (c) => {
+main.get('/:id',
+    requireDormitoryAccess,  
+    requireRole(['owner', 'manager']),
+    async (c) => {
     try {
         const db = c.env.DB;
         const dormitoryId = c.req.param('id');
@@ -47,9 +52,9 @@ main.get('/:id', requireRole(['owner', 'manager']), async (c) => {
         const ownerId = payload.userId;
 
         const dormitory = await db.prepare(`
-            SELECT * FROM dormitories WHERE id = ? AND owner_id = ?
+            SELECT * FROM dormitories WHERE id = ? 
         `)
-        .bind(dormitoryId, ownerId)
+        .bind(dormitoryId)
         .first(); 
 
         if (!dormitory) {
@@ -62,20 +67,14 @@ main.get('/:id', requireRole(['owner', 'manager']), async (c) => {
     }
 });
 
-main.get('/:id/stats', requireRole(['owner', 'manager']), async (c) => {
+main.get('/:id/stats', 
+    requireDormitoryAccess,
+    requireRole(['owner', 'manager']), 
+    async (c) => {
     try {
         const db = c.env.DB;
         const dormitoryId = c.req.param('id');
         const payload = c.get('jwtPayload');
-        const ownerId = payload.userId;
-
-        const dormitory = await db.prepare(`
-            SELECT id FROM dormitories WHERE id = ? AND owner_id = ?
-        `).bind(dormitoryId, ownerId).first();
-
-        if (!dormitory) {
-            return c.json({ success: false, message: "ไม่พบข้อมูลหอพักหรือคุณไม่มีสิทธิ์เข้าถึง" }, 404);
-        }
 
         const stats = await db.prepare(`
             SELECT 
@@ -107,35 +106,49 @@ main.get('/:id/stats', requireRole(['owner', 'manager']), async (c) => {
     }
 });
 
-main.post('/', requireRole(['owner']), async (c) => {
+main.post('/', async (c) => {
     try {
         const db = c.env.DB;
         const body = await c.req.json();
-        const payload = c.get('jwtPayload');
-        const ownerIdFromToken = payload.userId; 
+        const userId = c.get('jwtPayload').userId;
 
         const dormitoryId = crypto.randomUUID();
 
+        // 1️⃣ สร้าง dormitory
         await db.prepare(`
             INSERT INTO dormitories (
-                id, owner_id, name, address, phone_number, tax_id, due_date, fine_per_day
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                id, name, address, phone_number, tax_id, due_date, fine_per_day
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
         `)
         .bind(
-            dormitoryId, 
-            ownerIdFromToken,
-            body.name, 
-            body.address, 
-            body.phone_number, 
+            dormitoryId,
+            body.name,
+            body.address,
+            body.phone_number,
             body.tax_id || null,
-            body.due_date, 
+            body.due_date,
             body.fine_per_day
         )
         .run();
 
+        // 2️⃣ เพิ่ม owner คนแรก
+        await db.prepare(`
+            INSERT INTO dormitory_users (
+                id, dormitory_id, user_id, role
+            ) VALUES (?, ?, ?, 'owner')
+        `)
+        .bind(
+            crypto.randomUUID(),
+            dormitoryId,
+            userId
+        )
+        .run();
+
         return c.json({ success: true, dormitory_id: dormitoryId }, 201);
+
     } catch (err: any) {
         return c.json({ success: false, message: err.message }, 500);
     }
 });
+
 export default main;
