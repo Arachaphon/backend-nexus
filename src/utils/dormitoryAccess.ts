@@ -15,7 +15,6 @@ export const requireDormitoryAccess = async (c: Context, next: Next) => {
         return c.json({ error: 'Forbidden' }, 403)
     }
 
-    // 🔥 ต้องมีบรรทัดนี้
     c.set('dormRole', staff.role)
 
     await next()
