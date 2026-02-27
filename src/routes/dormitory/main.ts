@@ -12,7 +12,7 @@ main.get('/', async (c) => {
     try {
         const db = c.env.DB;
         const payload = c.get('jwtPayload');
-        const ownerId = payload.userId;
+        const userId = c.get('jwtPayload').userId;
 
         const { results } = await db.prepare(`
             SELECT 
@@ -33,7 +33,7 @@ main.get('/', async (c) => {
             FROM dormitories d
             JOIN dormitory_users du ON du.dormitory_id = d.id
             WHERE du.user_id = ?
-        `).bind(ownerId).all();
+        `).bind(userId).all();
 
         return c.json({ success: true, data: results });
     } catch (err: any) {
@@ -48,8 +48,7 @@ main.get('/:id',
     try {
         const db = c.env.DB;
         const dormitoryId = c.req.param('id');
-        const payload = c.get('jwtPayload');
-        const ownerId = payload.userId;
+        const userId = c.get('jwtPayload').userId;
 
         const dormitory = await db.prepare(`
             SELECT * FROM dormitories WHERE id = ? 
@@ -74,7 +73,7 @@ main.get('/:id/stats',
     try {
         const db = c.env.DB;
         const dormitoryId = c.req.param('id');
-        const payload = c.get('jwtPayload');
+        const userId = c.get('jwtPayload').userId;
 
         const stats = await db.prepare(`
             SELECT 
