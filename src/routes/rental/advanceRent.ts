@@ -7,8 +7,6 @@ const advances = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>(
 
 advances.use('/*', authMiddleware)
 
-// GET /api/advance-rent/contract/:contractId
-
 advances.get('/contract/:contractId',
     requireDormitoryAccess, 
     async (c) => {

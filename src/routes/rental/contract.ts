@@ -8,7 +8,7 @@ const contracts = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>
 contracts.use('/*', authMiddleware)
 
 // GET /api/rental/contracts/:contractId
-contracts.get('/:contractId',
+contracts.get('/dormitories/:dormitoryId/:contractId',
     requireDormitoryAccess, 
     async (c) => {
     const db = c.env.DB
