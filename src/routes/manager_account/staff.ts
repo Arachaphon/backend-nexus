@@ -123,88 +123,86 @@ staff.post('/', async (c) => {
 /**
  * PATCH STAFF
  */
-staff.patch('/:dormId/staff/:userId',
-  requireDormitoryAccess,
-  requireRole(['owner']),
+// เปลี่ยนจาก staff.patch('/:dormId/staff/:userId', ...) เป็น:
+staff.patch('/:userId', 
+  requireRole(['owner']), 
   async (c) => {
     const db = c.env.DB
-    const dormId = c.req.param('dormId')
     const userId = c.req.param('userId')
+    const currentUser = c.get('jwtPayload')
     const body = await c.req.json()
 
-    const exists = await db.prepare(`
-      SELECT id FROM dormitory_users
-      WHERE dormitory_id = ? AND user_id = ?
-    `).bind(dormId, userId).first()
+    const stmts = []
 
-    if (!exists) {
-      return c.json({ success: false, error: 'Staff not found' }, 404)
-    }
-
+    // --- ส่วนที่ 1: อัปเดตข้อมูล Profile ---
     const fields: string[] = []
     const values: any[] = []
 
     if (body.username)    { fields.push('username = ?');     values.push(body.username) }
     if (body.email)       { fields.push('email = ?');        values.push(body.email) }
     if (body.phoneNumber) { fields.push('phone_number = ?'); values.push(body.phoneNumber) }
-    if (body.password) {
+    
+    // ถ้าแก้รหัสผ่าน และไม่ใช่ค่า placeholder (..........) ถึงจะทำการ Hash และบันทึก
+    if (body.password && body.password !== '..........') {
       const hashed = await hashPassword(body.password)
       fields.push('password = ?')
       values.push(hashed)
     }
 
-    if (fields.length === 0) {
-      return c.json({ success: false, error: 'No fields to update' }, 400)
+    if (fields.length > 0) {
+      values.push(userId)
+      stmts.push(db.prepare(`UPDATE profiles SET ${fields.join(', ')} WHERE id = ?`).bind(...values))
     }
 
-    values.push(userId)
+    // --- ส่วนที่ 2: อัปเดตการเลือกหอพัก (Dormitory Sync) ---
+    if (body.dorm_ids && Array.isArray(body.dorm_ids)) {
+      // 1. ล้างสิทธิ์เดิมของพนักงานคนนี้ "เฉพาะในหอพักที่ผู้ใช้งานปัจจุบัน (Owner) มีสิทธิ์ดูแล"
+      stmts.push(db.prepare(`
+        DELETE FROM dormitory_users 
+        WHERE user_id = ? 
+        AND dormitory_id IN (SELECT dormitory_id FROM dormitory_users WHERE user_id = ?)
+      `).bind(userId, currentUser.userId))
 
-    await db.prepare(`
-      UPDATE profiles SET ${fields.join(', ')} WHERE id = ?
-    `).bind(...values).run()
+      // 2. เพิ่มสิทธิ์ใหม่ตามที่ติ๊กเลือกมาจากหน้าบ้าน
+      for (const dormId of body.dorm_ids) {
+        stmts.push(db.prepare(`
+          INSERT INTO dormitory_users (id, dormitory_id, user_id, role, assigned_by) 
+          VALUES (?, ?, ?, ?, ?)
+        `).bind(crypto.randomUUID(), dormId, userId, body.role || 'manager', currentUser.userId))
+      }
+    }
 
-    return c.json({ success: true })
+    try {
+      await db.batch(stmts) // รันคำสั่งทั้งหมดในครั้งเดียว (Transaction)
+      return c.json({ success: true })
+    } catch (err: any) {
+      return c.json({ success: false, message: err.message }, 500)
+    }
   }
 )
 
 /**
  * DELETE STAFF
  */
-staff.delete('/:dormId/staff/:userId',
-  requireDormitoryAccess,
-  requireRole(['owner']),
-  async (c) => {
-    const db = c.env.DB
-    const dormId = c.req.param('dormId')
-    const userId = c.req.param('userId')
-    const currentUser = c.get('jwtPayload')
+staff.delete('/:userId', requireRole(['owner']), async (c) => {
+  const db = c.env.DB
+  const userId = c.req.param('userId')
+  const currentUser = c.get('jwtPayload')
 
-    if (currentUser.userId === userId) {
-      return c.json({ success: false, error: 'Cannot delete yourself' }, 400)
-    }
-
-    const exists = await db.prepare(`
-      SELECT id FROM dormitory_users
-      WHERE dormitory_id = ? AND user_id = ?
-    `).bind(dormId, userId).first()
-
-    if (!exists) {
-      return c.json({ success: false, error: 'Staff not found' }, 404)
-    }
-
-    await db.batch([
-      db.prepare(`
-        DELETE FROM dormitory_users
-        WHERE dormitory_id = ? AND user_id = ?
-      `).bind(dormId, userId),
-
-      db.prepare(`
-        DELETE FROM profiles WHERE id = ?
-      `).bind(userId)
-    ])
-
-    return c.json({ success: true })
+  // ป้องกันการลบตัวเอง
+  if (currentUser.userId === userId) {
+    return c.json({ success: false, error: 'Cannot delete yourself' }, 400)
   }
-)
 
+  try {
+    // ลบทั้งสิทธิ์หอพักและโปรไฟล์
+    await db.batch([
+      db.prepare(`DELETE FROM dormitory_users WHERE user_id = ?`).bind(userId),
+      db.prepare(`DELETE FROM profiles WHERE id = ?`).bind(userId)
+    ])
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
 export default staff
