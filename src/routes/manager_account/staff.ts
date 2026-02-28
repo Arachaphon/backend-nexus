@@ -29,7 +29,6 @@ staff.get('/', async (c) => {
       WHERE du.dormitory_id IN (
         SELECT dormitory_id FROM dormitory_users WHERE user_id = ?
       )
-      AND p.id != ? 
       GROUP BY p.id
     `).bind(currentUser.userId, currentUser.userId).all()
 
