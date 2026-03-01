@@ -13,24 +13,33 @@ staff.get('/', async (c) => {
   const db = c.env.DB
   const currentUser = c.get('jwtPayload')
 
+  const myRole = await db.prepare(`
+    SELECT role FROM dormitory_users WHERE user_id = ? LIMIT 1
+  `).bind(currentUser.userId).first<{ role: string }>()
+
+  if (!myRole || myRole.role !== 'owner') {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
   try {
     const { results } = await db.prepare(`
       SELECT 
         p.id,
-        p.username as full_name,  -- แมปให้ตรงกับ Frontend
+        p.username         AS full_name,
         p.email,
-        p.phone_number as phone,   -- แมปให้ตรงกับ Frontend
-        MAX(du.role) as role,
-        GROUP_CONCAT(d.name, ', ') as dorm_label,
-        GROUP_CONCAT(d.id, ',') as dorm_ids
-      FROM profiles p
-      JOIN dormitory_users du ON p.id = du.user_id
-      JOIN dormitories d ON du.dormitory_id = d.id
+        p.phone_number     AS phone,
+        MAX(du.role)       AS role,
+        GROUP_CONCAT(DISTINCT d.name) AS dorm_label,
+        GROUP_CONCAT(DISTINCT d.id)   AS dorm_ids
+      FROM dormitory_users du
+      JOIN profiles p ON p.id = du.user_id
+      JOIN dormitories d ON d.id = du.dormitory_id
       WHERE du.dormitory_id IN (
         SELECT dormitory_id FROM dormitory_users WHERE user_id = ?
       )
       GROUP BY p.id
-    `).bind(currentUser.userId, currentUser.userId).all()
+      ORDER BY MAX(du.role) DESC, p.username ASC
+    `).bind(currentUser.userId).all()
 
     const data = results.map((r: any) => ({
       ...r,
@@ -48,12 +57,12 @@ staff.get('/', async (c) => {
 /**
  * GET STAFF BY ID
  */
-staff.get('/:dormId/staff/:userId',
+staff.get('/:dormitoryId/staff/:userId',
   requireDormitoryAccess,
   requireRole(['owner', 'manager']),
   async (c) => {
     const db = c.env.DB
-    const dormId = c.req.param('dormId')
+    const dormitoryId = c.req.param(':dormitoryId')
     const userId = c.req.param('userId')
     const currentUser = c.get('jwtPayload')
 
@@ -73,7 +82,7 @@ staff.get('/:dormId/staff/:userId',
       JOIN profiles p ON du.user_id = p.id
       WHERE du.dormitory_id = ?
       AND du.user_id = ?
-    `).bind(dormId, userId).first()
+    `).bind(dormitoryId, userId).first()
 
     if (!result) {
       return c.json({ success: false, error: 'Staff not found' }, 404)
