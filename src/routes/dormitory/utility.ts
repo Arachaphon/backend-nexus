@@ -1,18 +1,34 @@
 import { Hono } from 'hono'
+import { D1Database } from '@cloudflare/workers-types'
+import { authMiddleware } from '../../utils/authMiddleware'
+import { requireRole } from '../../utils/roleMiddleware'
+import { requireDormitoryAccess } from '../../utils/dormitoryAccess'
+
 const utilities = new Hono<{ Bindings: { DB: D1Database } }>()
 
-utilities.post('/save-settings', async (c) => {
+utilities.use('/*', authMiddleware)
+
+utilities.post('/:id',
+    requireDormitoryAccess, 
+    requireRole(['owner']), 
+    async (c) => {
     try {
         const db = c.env.DB;
+        const dormitoryId = c.req.param('id');
         const body = await c.req.json();
-        const { dormitoryId, water, electric } = body;
+        const { water, electric } = body;
+        const validTypes = ['meter_actual', 'meter_min', 'flat_rate'];
 
-        // 1. ตรวจสอบว่ามี dormitoryId ส่งมาหรือไม่
-        if (!dormitoryId) {
-            return c.json({ success: false, message: "Missing dormitoryId" }, 400);
+        if (
+            !water?.type ||
+            !electric?.type ||
+            !validTypes.includes(water.type) ||
+            !validTypes.includes(electric.type)
+        ) 
+        {
+        return c.json({ success: false, message: 'Invalid charge type' }, 400);
         }
 
-        // 2. ฟังก์ชันช่วยจัดการแปลงตัวเลข ป้องกัน NaN
         const parseNum = (val: any) => {
             const num = Number(val);
             return isNaN(num) ? null : num;
@@ -37,6 +53,13 @@ utilities.post('/save-settings', async (c) => {
             min: (electric.type === 'meter_min') ? parseNum(electric.min) : null,
             flat: (electric.type === 'flat_rate') ? parseNum(electric.price) : null
         };
+        const checkDorm = await db.prepare(
+            `SELECT id FROM dormitories WHERE id = ?`
+        ).bind(dormitoryId).first();
+
+        console.log("Dorm exists?", checkDorm);
+
+        console.log("Dorm exists?", checkDorm);
 
         // 3. ใช้ ON CONFLICT โดยต้องมั่นใจว่ารัน schema01.sql แล้ว
         const waterStmt = db.prepare(`
@@ -66,17 +89,15 @@ utilities.post('/save-settings', async (c) => {
         );
 
         // รันแบบ Batch
-        await db.batch([waterStmt, electricStmt]);
+        await waterStmt.run();
+        await electricStmt.run();
         
         return c.json({ success: true }, 200);
 
     } catch (err: any) {
-        console.error("Database Error:", err.message);
-        return c.json({ 
-            success: false, 
-            message: "Backend Error: " + err.message,
-            stack: err.stack 
-        }, 500);
+    console.error("ERROR MESSAGE:", err.message);
+    console.error("ERROR STACK:", err.stack);
+    return c.json({ error: err.message }, 500);
     }
 });
 
