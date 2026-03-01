@@ -10,14 +10,13 @@ meters.use('/*', authMiddleware)
 // GET /api/rental/meters/contract/:contractId
 
 meters.get('/contract/:contractId',
-    requireDormitoryAccess,
     async (c) => {
     const db = c.env.DB
     const contractId = c.req.param('contractId')
 
     const record = await db.prepare(`
         SELECT * FROM meter_readings
-        WHERE contract_id = ? AND reading_type = 'check_in'
+        WHERE contract_id = ? 
     `).bind(contractId).first()
 
     if (!record) {
@@ -61,36 +60,25 @@ meters.post('/', async (c) => {
         return c.json({ error: 'ไม่พบสัญญาที่ระบุ' }, 404)
     }
 
-    // --- ป้องกัน check_in ซ้ำ ---
-    const existing = await db.prepare(`
-        SELECT id FROM meter_readings
-        WHERE contract_id = ? AND reading_type = 'check_in'
-    `).bind(contract_id).first()
-
-    if (existing) {
-        return c.json({ error: 'บันทึกเลขมิเตอร์วันเข้าพักสำหรับสัญญานี้ไปแล้ว' }, 409)
-    }
-
     // --- INSERT meter_readings ---
     const id = crypto.randomUUID()
-    const formattedDate = new Date(reading_date).toISOString().split('T')[0]
-
-    await db.prepare(`
+   await db.prepare(`
         INSERT INTO meter_readings (
             id, 
             room_id, 
             contract_id,
-            reading_type, 
             reading_date,
-            water_unit_current, electric_unit_current,
-            water_unit_previous, electric_unit_previous
-        ) VALUES (?, ?, ?, 'check_in', ?, ?, ?, NULL, NULL)
+            water_unit_current,
+            electric_unit_current,
+            water_unit_previous,
+            electric_unit_previous
+        ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)
     `)
     .bind(
         id,
         room_id,
         contract_id,
-        formattedDate,
+        reading_date,
         Number(water_unit_current),
         Number(electric_unit_current)
     ).run()

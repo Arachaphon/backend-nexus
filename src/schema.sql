@@ -146,9 +146,7 @@ CREATE TABLE IF NOT EXISTS advance_rent_payments (
 CREATE TABLE IF NOT EXISTS meter_readings (
     id TEXT PRIMARY KEY,
     room_id TEXT NOT NULL,
-    contract_id TEXT,                               -- อ้างอิงสัญญา (NULL ถ้าเป็นการอ่านรายเดือนทั่วไป)
-    reading_type TEXT NOT NULL DEFAULT 'monthly'    -- 'check_in' | 'monthly'
-        CHECK (reading_type IN ('check_in', 'monthly')),
+    contract_id TEXT,                              
     reading_date DATE NOT NULL,
     water_unit_current REAL NOT NULL DEFAULT 0,
     electric_unit_current REAL NOT NULL DEFAULT 0,
