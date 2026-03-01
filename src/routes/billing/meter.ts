@@ -27,9 +27,7 @@ meters.get('/contract/:contractId',
     return c.json({ success: true, data: record })
 })
 
-meters.post('/',
-    requireDormitoryAccess,
-    async (c) => {
+meters.post('/', async (c) => {
     const db = c.env.DB
     const body = await c.req.json()
 
@@ -75,19 +73,24 @@ meters.post('/',
 
     // --- INSERT meter_readings ---
     const id = crypto.randomUUID()
+    const formattedDate = new Date(reading_date).toISOString().split('T')[0]
 
     await db.prepare(`
         INSERT INTO meter_readings (
-            id, room_id, contract_id,
-            reading_type, reading_date,
+            id, 
+            room_id, 
+            contract_id,
+            reading_type, 
+            reading_date,
             water_unit_current, electric_unit_current,
             water_unit_previous, electric_unit_previous
         ) VALUES (?, ?, ?, 'check_in', ?, ?, ?, NULL, NULL)
-    `).bind(
+    `)
+    .bind(
         id,
         room_id,
         contract_id,
-        reading_date,
+        formattedDate,
         Number(water_unit_current),
         Number(electric_unit_current)
     ).run()
