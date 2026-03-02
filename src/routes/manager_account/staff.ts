@@ -100,7 +100,6 @@ staff.post('/', async (c) => {
   try {
     const { username, email, password, phoneNumber, role, dorm_ids } = await c.req.json()
 
-    // เช็คข้อมูล
     if (!username || !dorm_ids || dorm_ids.length === 0) {
        return c.json({ success: false, message: 'กรุณาเลือกหอพักอย่างน้อย 1 แห่ง' }, 400)
     }
@@ -109,13 +108,11 @@ staff.post('/', async (c) => {
     const hashed = await hashPassword(password)
     const stmts = []
 
-    // 1. สร้าง Profile
     stmts.push(
       db.prepare(`INSERT INTO profiles (id, username, email, password, phone_number) VALUES (?, ?, ?, ?, ?)`)
         .bind(userId, username, email, hashed, phoneNumber || null)
     )
 
-    // 2. วนลูปสร้างสิทธิ์ในแต่ละหอพัก
     for (const dormId of dorm_ids) {
       stmts.push(
         db.prepare(`INSERT INTO dormitory_users (id, dormitory_id, user_id, role, assigned_by) VALUES (?, ?, ?, ?, ?)`)
@@ -133,18 +130,22 @@ staff.post('/', async (c) => {
 /**
  * PATCH STAFF
  */
-// เปลี่ยนจาก staff.patch('/:dormId/staff/:userId', ...) เป็น:
-staff.patch('/:userId', 
-  requireRole(['owner']), 
+staff.patch('/:userId',  
   async (c) => {
     const db = c.env.DB
     const userId = c.req.param('userId')
     const currentUser = c.get('jwtPayload')
+
+    const myRole = await db.prepare(`
+      SELECT role FROM dormitory_users WHERE user_id = ? LIMIT 1
+    `).bind(currentUser.userId).first<{ role: string }>()
+
+    if (!myRole || myRole.role !== 'owner') {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+
     const body = await c.req.json()
-
     const stmts = []
-
-    // --- ส่วนที่ 1: อัปเดตข้อมูล Profile ---
     const fields: string[] = []
     const values: any[] = []
 
@@ -152,7 +153,6 @@ staff.patch('/:userId',
     if (body.email)       { fields.push('email = ?');        values.push(body.email) }
     if (body.phoneNumber) { fields.push('phone_number = ?'); values.push(body.phoneNumber) }
     
-    // ถ้าแก้รหัสผ่าน และไม่ใช่ค่า placeholder (..........) ถึงจะทำการ Hash และบันทึก
     if (body.password && body.password !== '..........') {
       const hashed = await hashPassword(body.password)
       fields.push('password = ?')
@@ -164,16 +164,13 @@ staff.patch('/:userId',
       stmts.push(db.prepare(`UPDATE profiles SET ${fields.join(', ')} WHERE id = ?`).bind(...values))
     }
 
-    // --- ส่วนที่ 2: อัปเดตการเลือกหอพัก (Dormitory Sync) ---
     if (body.dorm_ids && Array.isArray(body.dorm_ids)) {
-      // 1. ล้างสิทธิ์เดิมของพนักงานคนนี้ "เฉพาะในหอพักที่ผู้ใช้งานปัจจุบัน (Owner) มีสิทธิ์ดูแล"
       stmts.push(db.prepare(`
         DELETE FROM dormitory_users 
         WHERE user_id = ? 
         AND dormitory_id IN (SELECT dormitory_id FROM dormitory_users WHERE user_id = ?)
       `).bind(userId, currentUser.userId))
 
-      // 2. เพิ่มสิทธิ์ใหม่ตามที่ติ๊กเลือกมาจากหน้าบ้าน
       for (const dormId of body.dorm_ids) {
         stmts.push(db.prepare(`
           INSERT INTO dormitory_users (id, dormitory_id, user_id, role, assigned_by) 
@@ -183,7 +180,7 @@ staff.patch('/:userId',
     }
 
     try {
-      await db.batch(stmts) // รันคำสั่งทั้งหมดในครั้งเดียว (Transaction)
+      await db.batch(stmts) 
       return c.json({ success: true })
     } catch (err: any) {
       return c.json({ success: false, message: err.message }, 500)
@@ -194,18 +191,24 @@ staff.patch('/:userId',
 /**
  * DELETE STAFF
  */
-staff.delete('/:userId', requireRole(['owner']), async (c) => {
+staff.delete('/:userId', async (c) => {
   const db = c.env.DB
   const userId = c.req.param('userId')
   const currentUser = c.get('jwtPayload')
 
-  // ป้องกันการลบตัวเอง
+  const myRole = await db.prepare(`
+    SELECT role FROM dormitory_users WHERE user_id = ? LIMIT 1
+  `).bind(currentUser.userId).first<{ role: string }>()
+
+  if (!myRole || myRole.role !== 'owner') {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+
   if (currentUser.userId === userId) {
     return c.json({ success: false, error: 'Cannot delete yourself' }, 400)
   }
 
   try {
-    // ลบทั้งสิทธิ์หอพักและโปรไฟล์
     await db.batch([
       db.prepare(`DELETE FROM dormitory_users WHERE user_id = ?`).bind(userId),
       db.prepare(`DELETE FROM profiles WHERE id = ?`).bind(userId)
