@@ -181,11 +181,22 @@ staff.patch('/:userId', async (c) => {
 
   try {
     if (stmts.length === 0) {
-      return c.json({ success: true }) // ไม่มีอะไรต้องอัปเดต
+      return c.json({ success: true })
     }
-    await db.batch(stmts)
+    // รันทีละ statement เพื่อ debug
+    for (let i = 0; i < stmts.length; i++) {
+      try {
+        await stmts[i].run()
+      } catch (e: any) {
+        console.error(`stmt[${i}] failed:`, e.message)
+        return c.json({ success: false, message: `stmt[${i}]: ${e.message}` }, 500)
+      }
+    }
     return c.json({ success: true })
   } catch (err: any) {
+    console.error('batch error:', err.message)
+    console.error('fields:', fields)
+    console.error('values:', values)
     return c.json({ success: false, message: err.message }, 500)
   }
 })
