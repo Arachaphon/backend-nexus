@@ -40,7 +40,7 @@ staff.get('/', async (c) => {
         AND du.user_id != ?
       GROUP BY p.id
       ORDER BY MAX(du.role) DESC, p.username ASC
-    `).bind(currentUser.userId , currentUser.userId).all()
+    `).bind(currentUser.userId, currentUser.userId).all()
 
     const data = results.map((r: any) => ({
       ...r,
@@ -53,7 +53,6 @@ staff.get('/', async (c) => {
     return c.json({ success: false, message: err.message }, 500)
   }
 })
-
 
 /**
  * GET STAFF BY ID
@@ -130,63 +129,66 @@ staff.post('/', async (c) => {
 /**
  * PATCH STAFF
  */
-staff.patch('/:userId',  
-  async (c) => {
-    const db = c.env.DB
-    const userId = c.req.param('userId')
-    const currentUser = c.get('jwtPayload')
+staff.patch('/:userId', async (c) => {
+  const db = c.env.DB
+  const userId = c.req.param('userId')
+  const currentUser = c.get('jwtPayload')
 
-    const myRole = await db.prepare(`
-      SELECT role FROM dormitory_users WHERE user_id = ? LIMIT 1
-    `).bind(currentUser.userId).first<{ role: string }>()
+  const myRole = await db.prepare(`
+    SELECT role FROM dormitory_users WHERE user_id = ? LIMIT 1
+  `).bind(currentUser.userId).first<{ role: string }>()
 
-    if (!myRole || myRole.role !== 'owner') {
-      return c.json({ error: 'Forbidden' }, 403)
-    }
+  if (!myRole || myRole.role !== 'owner') {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
 
-    const body = await c.req.json()
-    const stmts = []
-    const fields: string[] = []
-    const values: any[] = []
+  const body = await c.req.json()
+  const stmts = []
+  const fields: string[] = []
+  const values: any[] = []
 
-    if (body.username)    { fields.push('username = ?');     values.push(body.username) }
-    if (body.email)       { fields.push('email = ?');        values.push(body.email) }
-    if (body.phoneNumber) { fields.push('phone_number = ?'); values.push(body.phoneNumber) }
-    
-    if (body.password && body.password !== '..........') {
-      const hashed = await hashPassword(body.password)
-      fields.push('password = ?')
-      values.push(hashed)
-    }
+  if (body.username)    { fields.push('username = ?');     values.push(body.username) }
+  if (body.email)       { fields.push('email = ?');        values.push(body.email) }
+  if (body.phoneNumber) { fields.push('phone_number = ?'); values.push(body.phoneNumber) }
+  
+  if (body.password && body.password !== '..........') {
+    const hashed = await hashPassword(body.password)
+    fields.push('password = ?')
+    values.push(hashed)
+  }
 
-    if (fields.length > 0) {
-      values.push(userId)
-      stmts.push(db.prepare(`UPDATE profiles SET ${fields.join(', ')} WHERE id = ?`).bind(...values))
-    }
+  if (fields.length > 0) {
+    values.push(userId)
+    console.log('UPDATE fields:', fields)
+    console.log('UPDATE values:', values)
+    stmts.push(db.prepare(`UPDATE profiles SET ${fields.join(', ')} WHERE id = ?`).bind(...values))
+  }
 
-    if (body.dorm_ids && Array.isArray(body.dorm_ids)) {
+  if (body.dorm_ids && Array.isArray(body.dorm_ids)) {
+    stmts.push(db.prepare(`
+      DELETE FROM dormitory_users 
+      WHERE user_id = ? 
+      AND dormitory_id IN (SELECT dormitory_id FROM dormitory_users WHERE user_id = ?)
+    `).bind(userId, currentUser.userId))
+
+    for (const dormId of body.dorm_ids) {
       stmts.push(db.prepare(`
-        DELETE FROM dormitory_users 
-        WHERE user_id = ? 
-        AND dormitory_id IN (SELECT dormitory_id FROM dormitory_users WHERE user_id = ?)
-      `).bind(userId, currentUser.userId))
-
-      for (const dormId of body.dorm_ids) {
-        stmts.push(db.prepare(`
-          INSERT INTO dormitory_users (id, dormitory_id, user_id, role, assigned_by) 
-          VALUES (?, ?, ?, ?, ?)
-        `).bind(crypto.randomUUID(), dormId, userId, body.role || 'manager', currentUser.userId))
-      }
-    }
-
-    try {
-      await db.batch(stmts) 
-      return c.json({ success: true })
-    } catch (err: any) {
-      return c.json({ success: false, message: err.message }, 500)
+        INSERT INTO dormitory_users (id, dormitory_id, user_id, role, assigned_by) 
+        VALUES (?, ?, ?, ?, ?)
+      `).bind(crypto.randomUUID(), dormId, userId, body.role || 'manager', currentUser.userId))
     }
   }
-)
+
+  try {
+    if (stmts.length === 0) {
+      return c.json({ success: true }) // ไม่มีอะไรต้องอัปเดต
+    }
+    await db.batch(stmts)
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
 
 /**
  * DELETE STAFF
@@ -218,4 +220,5 @@ staff.delete('/:userId', async (c) => {
     return c.json({ success: false, message: err.message }, 500)
   }
 })
+
 export default staff
