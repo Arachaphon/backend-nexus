@@ -7,14 +7,70 @@ const contracts = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>
 
 contracts.use('/*', authMiddleware)
 
-// GET /api/rental/contracts/:contractId
-contracts.get('/dormitories/:dormitoryId/:contractId',
-    requireDormitoryAccess, 
-    async (c) => {
+// GET /api/rentals/contracts/dormitories/:dormitoryId
+contracts.get('/dormitories/:dormitoryId', requireDormitoryAccess, async (c) => {
+    const db = c.env.DB
+    const dormitoryId = c.req.param('dormitoryId')
+
+    const result = await db.prepare(`
+        SELECT c.*
+        FROM contracts c
+        JOIN rooms r ON r.id = c.room_id
+        JOIN floors f ON r.floor_id = f.id
+        JOIN dormitories d ON f.dormitories_id = d.id
+        WHERE d.id = ?
+        ORDER BY r.room_number ASC
+    `).bind(dormitoryId).all()
+
+    return c.json({ success: true, data: result.results })
+})
+
+// GET /api/rentals/contracts/dormitories/:dormitoryId/rooms/:roomId
+contracts.get('/dormitories/:dormitoryId/rooms/:roomId', requireDormitoryAccess, async (c) => {
+    const db = c.env.DB
+    const roomId = c.req.param('roomId')
+
+    const contractsResult = await db.prepare(`
+        SELECT *
+        FROM contracts
+        WHERE room_id = ?
+        ORDER BY check_in_date DESC
+    `).bind(roomId).all()
+
+    const contractsList = contractsResult.results
+
+    if (!contractsList.length) {
+        return c.json({ success: true, data: [] })
+    }
+
+    const placeholders = contractsList.map(() => '?').join(',')
+
+    const tenantsResult = await db.prepare(`
+        SELECT t.*, ct.contract_id, ct.is_primary
+        FROM contract_tenants ct
+        JOIN tenants t ON t.id = ct.tenant_id
+        WHERE ct.contract_id IN (${placeholders})
+    `).bind(...contractsList.map(c => c.id)).all()
+
+    const tenants = tenantsResult.results
+
+    const data = contractsList.map(contract => ({
+        ...contract,
+        tenants: tenants.filter(t => t.contract_id === contract.id)
+    }))
+
+    return c.json({ success: true, data })
+})
+
+// GET /api/rentals/contracts/dormitories/:dormitoryId/:contractId
+contracts.get('/dormitories/:dormitoryId/:contractId', requireDormitoryAccess, async (c) => {
     const db = c.env.DB
     const contractId = c.req.param('contractId')
 
-    const contract = await db.prepare(`SELECT * FROM contracts WHERE id = ?`).bind(contractId).first()
+    const contract = await db.prepare(`
+        SELECT * FROM contracts WHERE id = ?
+    `).bind(contractId).first()
+
     if (!contract) {
         return c.json({ error: 'ไม่พบสัญญา' }, 404)
     }
@@ -29,22 +85,17 @@ contracts.get('/dormitories/:dormitoryId/:contractId',
     return c.json({ success: true, data: { ...contract, tenants: tenants.results } })
 })
 
+// POST /api/rentals/contracts
 contracts.post('/', async (c) => {
     const db = c.env.DB
     const body = await c.req.json()
 
     const {
-        room_id,
-        check_in_date,
-        check_out_date,
-        rent_price,
-        security_deposit,
-        security_deposit_type,
-        booking_fee,
-        tenant,
+        room_id, check_in_date, check_out_date,
+        rent_price, security_deposit, security_deposit_type,
+        booking_fee, tenant,
     } = body
 
-    // --- Validate ---
     if (!room_id || !check_in_date || rent_price == null || security_deposit == null || !security_deposit_type) {
         return c.json({ error: 'กรุณากรอกข้อมูลสัญญาให้ครบ' }, 400)
     }
@@ -55,27 +106,14 @@ contracts.post('/', async (c) => {
         return c.json({ error: 'security_deposit_type ต้องเป็น "เงินสด" หรือ "โอนเงินธนาคาร"' }, 400)
     }
 
-    // --- ตรวจสอบห้องว่าว่างอยู่ไหม ---
     const room = await db.prepare(`SELECT id, status FROM rooms WHERE id = ?`).bind(room_id).first<{ id: string; status: string }>()
-    if (!room) {
-        return c.json({ error: 'ไม่พบห้องที่ระบุ' }, 404)
-    }
-    if (room.status !== 'vacant') {
-        return c.json({ error: 'ห้องนี้ไม่ว่าง ไม่สามารถสร้างสัญญาได้' }, 409)
-    }
+    if (!room) return c.json({ error: 'ไม่พบห้องที่ระบุ' }, 404)
+    if (room.status !== 'vacant') return c.json({ error: 'ห้องนี้ไม่ว่าง ไม่สามารถสร้างสัญญาได้' }, 409)
 
-    // --- สร้าง tenant ---
     const tenantId = crypto.randomUUID()
     await db.prepare(`
-        INSERT INTO tenants (
-            id, first_name, last_name,
-            phone_number, id_card_or_passport,
-            address,
-            emergency_contact_name,
-            emergency_contact_relation,
-            emergency_contact_phone,
-            note
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO tenants (id, first_name, last_name, phone_number, id_card_or_passport, address, emergency_contact_name, emergency_contact_relation, emergency_contact_phone, note)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
         tenantId,
         tenant.first_name, tenant.last_name,
@@ -87,46 +125,27 @@ contracts.post('/', async (c) => {
         tenant.note ?? null
     ).run()
 
-    // --- สร้าง contract ---
     const contractId = crypto.randomUUID()
     await db.prepare(`
-        INSERT INTO contracts (
-            id, room_id,
-            check_in_date, check_out_date,
-            rent_price,
-            security_deposit, security_deposit_type,
-            booking_fee
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO contracts (id, room_id, check_in_date, check_out_date, rent_price, security_deposit, security_deposit_type, booking_fee)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-        contractId,
-        room_id,
-        check_in_date,
-        check_out_date ?? null,
-        rent_price,
-        security_deposit,
-        security_deposit_type,
+        contractId, room_id, check_in_date,
+        check_out_date ?? null, rent_price,
+        security_deposit, security_deposit_type,
         booking_fee ?? 0
     ).run()
 
-    // --- ผูก tenant กับ contract (is_primary = 1) ---
-    const ctId = crypto.randomUUID()
     await db.prepare(`
         INSERT INTO contract_tenants (id, contract_id, tenant_id, is_primary)
         VALUES (?, ?, ?, 1)
-    `).bind(ctId, contractId, tenantId).run()
+    `).bind(crypto.randomUUID(), contractId, tenantId).run()
 
-    // --- อัพเดตสถานะห้องเป็น occupied ---
     await db.prepare(`
         UPDATE rooms SET status = 'occupied', current_rent_price = ? WHERE id = ?
     `).bind(rent_price, room_id).run()
 
-    return c.json({
-        success: true,
-        data: {
-            contract_id: contractId,
-            tenant_id: tenantId,
-        }
-    }, 201)
+    return c.json({ success: true, data: { contract_id: contractId, tenant_id: tenantId } }, 201)
 })
 
 export default contracts
