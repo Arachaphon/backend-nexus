@@ -37,9 +37,10 @@ staff.get('/', async (c) => {
       WHERE du.dormitory_id IN (
         SELECT dormitory_id FROM dormitory_users WHERE user_id = ?
       )
+        AND du.user_id != ?
       GROUP BY p.id
       ORDER BY MAX(du.role) DESC, p.username ASC
-    `).bind(currentUser.userId).all()
+    `).bind(currentUser.userId , currentUser.userId).all()
 
     const data = results.map((r: any) => ({
       ...r,
