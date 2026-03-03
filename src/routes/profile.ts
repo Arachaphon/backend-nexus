@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { hashPassword, verifyPassword } from '../utils/hash'
 import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../utils/authMiddleware'
-import { requireRole } from '../utils/roleMiddleware'
+import { requireGlobalRole } from '../utils/requireGlobalRole'
 
 const profile = new Hono<{ Bindings: { DB: D1Database } }>()
 
@@ -12,7 +12,7 @@ profile.use('/*', authMiddleware)
  * GET MY PROFILE
  */
 profile.get('/',
-  requireRole(['owner']), 
+   requireGlobalRole(['owner']),
   async (c) => {
 
   const payload = c.get('jwtPayload')
@@ -32,7 +32,7 @@ profile.get('/',
  * UPDATE PROFILE
  */
 profile.patch('/',
-  requireRole(['owner']), 
+  requireGlobalRole(['owner']),
   async (c) => {
 
   const payload = c.get('jwtPayload')
@@ -57,7 +57,7 @@ profile.patch('/',
  * CHANGE PASSWORD
  */
 profile.patch('/password',
-  requireRole(['owner']), 
+  requireGlobalRole(['owner']),
   async (c) => {
 
   const payload = c.get('jwtPayload')

@@ -1,7 +1,6 @@
 import { Hono } from 'hono'
 import { authMiddleware } from '../../utils/authMiddleware'
-import { requireRole } from '../../utils/roleMiddleware'
-import { requireDormitoryAccess } from '../../utils/dormitoryAccess'
+import { requireGlobalRole } from '../../utils/requireGlobalRole'
 import { hashPassword } from '../../utils/hash'
 import { D1Database } from '@cloudflare/workers-types'
 
@@ -9,17 +8,11 @@ const staff = new Hono<{ Bindings: { DB: D1Database } }>()
 
 staff.use('/*', authMiddleware)
 
-staff.get('/', async (c) => {
+staff.get('/',
+  requireGlobalRole(['owner']),
+  async (c) => {
   const db = c.env.DB
   const currentUser = c.get('jwtPayload')
-
-  const myRole = await db.prepare(`
-    SELECT role FROM dormitory_users WHERE user_id = ? LIMIT 1
-  `).bind(currentUser.userId).first<{ role: string }>()
-
-  if (!myRole || myRole.role !== 'owner') {
-    return c.json({ error: 'Forbidden' }, 403)
-  }
 
   try {
     const { results } = await db.prepare(`
@@ -57,42 +50,44 @@ staff.get('/', async (c) => {
 /**
  * GET STAFF BY ID
  */
-staff.get('/:dormitoryId/staff/:userId',
-  requireDormitoryAccess,
-  requireRole(['owner', 'manager']),
+// staff.get('/:dormitoryId/staff/:userId',
+//   requireDormitoryAccess,
+//   requireRole(['owner', 'manager']),
+//   async (c) => {
+//     const db = c.env.DB
+//     const dormitoryId = c.req.param(':dormitoryId')
+//     const userId = c.req.param('userId')
+//     const currentUser = c.get('jwtPayload')
+
+//     if (currentUser.role === 'manager' && currentUser.userId !== userId) {
+//       return c.json({ success: false }, 403)
+//     }
+
+//     const result = await db.prepare(`
+//       SELECT 
+//         p.id,
+//         p.username,
+//         p.email,
+//         p.phone_number,
+//         du.role,
+//         du.assigned_at AS created_at
+//       FROM dormitory_users du
+//       JOIN profiles p ON du.user_id = p.id
+//       WHERE du.dormitory_id = ?
+//       AND du.user_id = ?
+//     `).bind(dormitoryId, userId).first()
+
+//     if (!result) {
+//       return c.json({ success: false, error: 'Staff not found' }, 404)
+//     }
+
+//     return c.json({ success: true, data: result })
+//   }
+// )
+
+staff.post('/',
+  requireGlobalRole(['owner']), 
   async (c) => {
-    const db = c.env.DB
-    const dormitoryId = c.req.param(':dormitoryId')
-    const userId = c.req.param('userId')
-    const currentUser = c.get('jwtPayload')
-
-    if (currentUser.role === 'manager' && currentUser.userId !== userId) {
-      return c.json({ success: false }, 403)
-    }
-
-    const result = await db.prepare(`
-      SELECT 
-        p.id,
-        p.username,
-        p.email,
-        p.phone_number,
-        du.role,
-        du.assigned_at AS created_at
-      FROM dormitory_users du
-      JOIN profiles p ON du.user_id = p.id
-      WHERE du.dormitory_id = ?
-      AND du.user_id = ?
-    `).bind(dormitoryId, userId).first()
-
-    if (!result) {
-      return c.json({ success: false, error: 'Staff not found' }, 404)
-    }
-
-    return c.json({ success: true, data: result })
-  }
-)
-
-staff.post('/', async (c) => {
   const db = c.env.DB
   const currentUser = c.get('jwtPayload')
   
@@ -129,18 +124,12 @@ staff.post('/', async (c) => {
 /**
  * PATCH STAFF
  */
-staff.patch('/:userId', async (c) => {
+staff.patch('/:userId',
+  requireGlobalRole(['owner']), 
+  async (c) => {
   const db = c.env.DB
   const userId = c.req.param('userId')
   const currentUser = c.get('jwtPayload')
-
-  const myRole = await db.prepare(`
-    SELECT role FROM dormitory_users WHERE user_id = ? LIMIT 1
-  `).bind(currentUser.userId).first<{ role: string }>()
-
-  if (!myRole || myRole.role !== 'owner') {
-    return c.json({ error: 'Forbidden' }, 403)
-  }
 
   const body = await c.req.json()
   const stmts = []
@@ -204,18 +193,12 @@ staff.patch('/:userId', async (c) => {
 /**
  * DELETE STAFF
  */
-staff.delete('/:userId', async (c) => {
+staff.delete('/:userId',
+  requireGlobalRole(['owner']), 
+  async (c) => {
   const db = c.env.DB
   const userId = c.req.param('userId')
   const currentUser = c.get('jwtPayload')
-
-  const myRole = await db.prepare(`
-    SELECT role FROM dormitory_users WHERE user_id = ? LIMIT 1
-  `).bind(currentUser.userId).first<{ role: string }>()
-
-  if (!myRole || myRole.role !== 'owner') {
-    return c.json({ error: 'Forbidden' }, 403)
-  }
 
   if (currentUser.userId === userId) {
     return c.json({ success: false, error: 'Cannot delete yourself' }, 400)
