@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { hashPassword, verifyPassword } from '../utils/hash'
 import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../utils/authMiddleware'
-import { requireRole } from '../../utils/roleMiddleware'
+import { requireRole } from '../utils/roleMiddleware'
 
 const profile = new Hono<{ Bindings: { DB: D1Database } }>()
 
