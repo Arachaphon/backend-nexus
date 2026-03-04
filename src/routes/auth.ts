@@ -48,10 +48,13 @@ auth.post('/login', async (c) => {
       return c.json({ success: false, message: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" }, 401)
     }
 
-    // ✅ เพิ่มตรงนี้
     const dormUser = await db.prepare(
       `SELECT role FROM dormitory_users WHERE user_id = ? LIMIT 1`
     ).bind(user!.id).first<{ role: string }>()
+
+    const profile = await db.prepare(
+      `SELECT global_role FROM profiles WHERE id = ?`
+    ).bind(user!.id).first<{ global_role: string }>()
 
     const payload = {
       userId: user!.id,
@@ -66,7 +69,8 @@ auth.post('/login', async (c) => {
       user: {
         id: user!.id,
         username: user!.username,
-        role: dormUser?.role ?? null  
+        role: dormUser?.role ?? null,
+        global_role: profile?.global_role ?? null
       },
       token
     }, 200)

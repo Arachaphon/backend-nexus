@@ -3,6 +3,7 @@ import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../../utils/authMiddleware'
 import { requireRole } from '../../utils/roleMiddleware'
 import { requireDormitoryAccess } from '../../utils/dormitoryAccess'
+import { requireGlobalRole } from '../../utils/requireGlobalRole'
 
 const banks = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
@@ -30,8 +31,7 @@ banks.get('/:id',
 });
 
 banks.post('/:id',
-    requireDormitoryAccess,
-    requireRole(['owner']),
+    requireGlobalRole(['landlord','owner']),
     async (c) => {
 
     const db = c.env.DB;

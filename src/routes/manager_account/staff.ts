@@ -8,8 +8,8 @@ const staff = new Hono<{ Bindings: { DB: D1Database } }>()
 
 staff.use('/*', authMiddleware)
 
-staff.get('/',
-  requireGlobalRole(['owner']),
+staff.get('/', 
+  requireGlobalRole(['landlord','owner']),
   async (c) => {
   const db = c.env.DB
   const currentUser = c.get('jwtPayload')
@@ -85,8 +85,8 @@ staff.get('/',
 //   }
 // )
 
-staff.post('/',
-  requireGlobalRole(['owner']), 
+staff.post('/',                           
+  requireGlobalRole(['landlord', 'owner']),
   async (c) => {
   const db = c.env.DB
   const currentUser = c.get('jwtPayload')
@@ -125,7 +125,8 @@ staff.post('/',
  * PATCH STAFF
  */
 staff.patch('/:userId',
-  requireGlobalRole(['owner']), 
+  authMiddleware,                            
+  requireGlobalRole(['landlord', 'owner']),
   async (c) => {
   const db = c.env.DB
   const userId = c.req.param('userId')
@@ -194,7 +195,8 @@ staff.patch('/:userId',
  * DELETE STAFF
  */
 staff.delete('/:userId',
-  requireGlobalRole(['owner']), 
+  authMiddleware,                              
+  requireGlobalRole(['landlord', 'owner']),
   async (c) => {
   const db = c.env.DB
   const userId = c.req.param('userId')
