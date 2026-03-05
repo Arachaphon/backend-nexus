@@ -8,6 +8,67 @@ const contracts = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>
 
 contracts.use('/*', authMiddleware)
 
+// GET /api/rentals/contracts/dormitories/:dormitoryId
+contracts.get('/dormitories/:dormitoryId', 
+    requireDormitoryAccess, 
+    requireRole(['owner', 'manager']),
+    async (c) => {
+    const db = c.env.DB
+    const dormitoryId = c.req.param('dormitoryId')
+
+    const result = await db.prepare(`
+        SELECT c.*
+        FROM contracts c
+        JOIN rooms r ON r.id = c.room_id
+        JOIN floors f ON r.floor_id = f.id
+        JOIN dormitories d ON f.dormitories_id = d.id
+        WHERE d.id = ?
+        ORDER BY r.room_number ASC
+    `).bind(dormitoryId).all()
+
+    return c.json({ success: true, data: result.results })
+})
+
+// GET /api/rentals/contracts/dormitories/:dormitoryId/rooms/:roomId
+contracts.get('/dormitories/:dormitoryId/rooms/:roomId', 
+    requireDormitoryAccess,
+    requireRole(['owner', 'manager']), 
+    async (c) => {
+    const db = c.env.DB
+    const roomId = c.req.param('roomId')
+
+    const contractsResult = await db.prepare(`
+        SELECT *
+        FROM contracts
+        WHERE room_id = ?
+        ORDER BY check_in_date DESC
+    `).bind(roomId).all()
+
+    const contractsList = contractsResult.results
+
+    if (!contractsList.length) {
+        return c.json({ success: true, data: [] })
+    }
+
+    const placeholders = contractsList.map(() => '?').join(',')
+
+    const tenantsResult = await db.prepare(`
+        SELECT t.*, ct.contract_id, ct.is_primary
+        FROM contract_tenants ct
+        JOIN tenants t ON t.id = ct.tenant_id
+        WHERE ct.contract_id IN (${placeholders})
+    `).bind(...contractsList.map(c => c.id)).all()
+
+    const tenants = tenantsResult.results
+
+    const data = contractsList.map(contract => ({
+        ...contract,
+        tenants: tenants.filter(t => t.contract_id === contract.id)
+    }))
+
+    return c.json({ success: true, data })
+})
+
 // GET /api/rental/contracts/:contractId
 contracts.get('/dormitories/:dormitoryId/:contractId',
     requireDormitoryAccess,

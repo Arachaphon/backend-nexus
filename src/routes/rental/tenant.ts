@@ -8,6 +8,78 @@ const tenants = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
 tenants.use('/*', authMiddleware)
 
+// GET tenants by dormitory_id
+tenants.get(
+  '/dormitories/:dormitoryId',
+  requireDormitoryAccess,
+  requireRole(['owner', 'manager']), 
+  async (c) => {
+    try {
+        const db = c.env.DB
+        const dormitoryId = c.req.param('dormitoryId')
+        const result = await db.prepare(`
+        SELECT DISTINCT
+            t.*,
+            r.id as room_id
+
+        FROM tenants t
+        JOIN contract_tenants ct ON t.id = ct.tenant_id
+        JOIN contracts con ON con.id = ct.contract_id
+        JOIN rooms r ON r.id = con.room_id
+        JOIN floors f ON r.floor_id = f.id
+
+        WHERE f.dormitories_id = ?
+        `)
+        .bind(dormitoryId)
+        .all()
+
+        return c.json({
+            success: true,
+            data: result.results
+        })
+
+    } catch (err) {
+      console.error("GET TENANTS BY DORM ERROR:", err)
+      return c.json({ error: 'server error' }, 500)
+    }
+  }
+)
+
+// GET tenants by room_id
+tenants.get(
+  '/dormitories/:dormitoryId/rooms/:roomId',
+  requireDormitoryAccess,
+  requireRole(['owner', 'manager']), 
+  async (c) => {
+    const db = c.env.DB
+    const roomId = c.req.param('roomId')
+
+    const result = await db.prepare(`
+      SELECT 
+        t.*,
+        ct.contract_id,
+        ct.is_primary
+      FROM contracts con
+      JOIN contract_tenants ct ON con.id = ct.contract_id
+      JOIN tenants t ON t.id = ct.tenant_id
+      WHERE con.room_id = ?
+      ORDER BY ct.is_primary DESC
+    `)
+    .bind(roomId)
+    .all()
+
+    const tenants = result.results
+
+    if (!tenants.length) {
+      return c.json({ success: true, data: [] })
+    }
+
+    return c.json({
+      success: true,
+      data: tenants
+    })
+  }
+)
 // GET /api/rental/tenants/:id
 // ดึงข้อมูลผู้เช่า
 tenants.get('/:id',
