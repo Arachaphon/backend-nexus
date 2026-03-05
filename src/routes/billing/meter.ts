@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../../utils/authMiddleware'
 import { requireDormitoryAccess } from '../../utils/dormitoryAccess'
+import { requireRole } from '../../utils/roleMiddleware'
 
 const meters = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
@@ -10,6 +11,8 @@ meters.use('/*', authMiddleware)
 // GET /api/rental/meters/contract/:contractId
 
 meters.get('/contract/:contractId',
+    requireDormitoryAccess,
+    requireRole(['owner', 'manager']),
     async (c) => {
     const db = c.env.DB
     const contractId = c.req.param('contractId')
@@ -26,7 +29,10 @@ meters.get('/contract/:contractId',
     return c.json({ success: true, data: record })
 })
 
-meters.post('/', async (c) => {
+meters.post('/',
+    requireDormitoryAccess,
+    requireRole(['owner', 'manager']), 
+    async (c) => {
     const db = c.env.DB
     const body = await c.req.json()
 
