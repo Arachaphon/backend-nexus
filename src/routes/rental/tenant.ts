@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../../utils/authMiddleware'
 import { requireDormitoryAccess } from '../../utils/dormitoryAccess'
+import { requireRole } from '../../utils/roleMiddleware'
 
 const tenants = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
@@ -10,7 +11,8 @@ tenants.use('/*', authMiddleware)
 // GET /api/rental/tenants/:id
 // ดึงข้อมูลผู้เช่า
 tenants.get('/:id',
-    requireDormitoryAccess, 
+    requireDormitoryAccess,
+    requireRole(['owner', 'manager']),  
     async (c) => {
     const db = c.env.DB
     const id = c.req.param('id')
@@ -27,7 +29,8 @@ tenants.get('/:id',
 // POST /api/rental/tenants
 // สร้างผู้เช่าใหม่
 tenants.post('/',
-    requireDormitoryAccess, 
+    requireDormitoryAccess,
+    requireRole(['owner', 'manager']),  
     async (c) => {
     const db = c.env.DB
     const body = await c.req.json()

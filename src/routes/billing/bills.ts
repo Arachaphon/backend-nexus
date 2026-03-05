@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
-import { authMiddleware } from '../../utils/authMiddleware'
-import { requireRole } from '../../utils/roleMiddleware'
-import { requireDormitoryAccess } from '../../utils/dormitoryAccess'
 import { D1Database } from '@cloudflare/workers-types'
+import { authMiddleware } from '../../utils/authMiddleware'
+import { requireDormitoryAccess } from '../../utils/dormitoryAccess'
+import { requireRole } from '../../utils/roleMiddleware'
 
 const bills = new Hono<{ Bindings: { DB: D1Database } }>()
 

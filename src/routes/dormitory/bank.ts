@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../../utils/authMiddleware'
-import { requireRole } from '../../utils/roleMiddleware'
 import { requireDormitoryAccess } from '../../utils/dormitoryAccess'
+import { requireRole } from '../../utils/roleMiddleware'
 import { requireGlobalRole } from '../../utils/requireGlobalRole'
 
 const banks = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()

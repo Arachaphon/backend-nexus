@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
+import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../../utils/authMiddleware'
 import { requireGlobalRole } from '../../utils/requireGlobalRole'
 import { hashPassword } from '../../utils/hash'
-import { D1Database } from '@cloudflare/workers-types'
 
 const staff = new Hono<{ Bindings: { DB: D1Database } }>()
 
