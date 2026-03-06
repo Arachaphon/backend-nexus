@@ -8,7 +8,7 @@ const meters = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
 meters.use('/*', authMiddleware)
 
-meters.get('/contracts/:contractId',
+meters.get('/:dormitoryId/contracts/:contractId',
 requireDormitoryAccess,
 requireRole(['owner','manager']),
 async (c) => {
@@ -36,7 +36,7 @@ async (c) => {
     })
 })
 
-meters.post('/',
+meters.post('/:dormitoryId',
     requireDormitoryAccess,
     requireRole(['owner', 'manager']), 
     async (c) => {
