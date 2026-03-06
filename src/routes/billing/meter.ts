@@ -8,25 +8,32 @@ const meters = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
 meters.use('/*', authMiddleware)
 
-// GET /api/rental/meters/contract/:contractId
+meters.get('/contracts/:contractId',
+requireDormitoryAccess,
+requireRole(['owner','manager']),
+async (c) => {
 
-meters.get('/contract/:contractId',
-    requireDormitoryAccess,
-    requireRole(['owner', 'manager']),
-    async (c) => {
     const db = c.env.DB
     const contractId = c.req.param('contractId')
 
     const record = await db.prepare(`
-        SELECT * FROM meter_readings
-        WHERE contract_id = ? 
-    `).bind(contractId).first()
+        SELECT *
+        FROM meter_readings
+        WHERE contract_id = ?
+        ORDER BY reading_date DESC
+        LIMIT 1
+    `)
+    .bind(contractId)
+    .first()
 
     if (!record) {
-        return c.json({ error: 'ไม่พบข้อมูลมิเตอร์' }, 404)
+        return c.json({ error:'ไม่พบข้อมูลมิเตอร์' },404)
     }
 
-    return c.json({ success: true, data: record })
+    return c.json({
+        success:true,
+        data:record
+    })
 })
 
 meters.post('/',
