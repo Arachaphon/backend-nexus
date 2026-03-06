@@ -82,14 +82,14 @@ tenants.get(
 )
 // GET /api/rental/tenants/:id
 // ดึงข้อมูลผู้เช่า
-tenants.get('/:id',
+tenants.get('/dormitories/:dormitoryId/tenants/:tenantId',
     requireDormitoryAccess,
     requireRole(['owner', 'manager']),  
     async (c) => {
     const db = c.env.DB
-    const id = c.req.param('id')
+    const tenantId = c.req.param('tenantId')
 
-    const tenant = await db.prepare(`SELECT * FROM tenants WHERE id = ?`).bind(id).first()
+    const tenant = await db.prepare(`SELECT * FROM tenants WHERE id = ?`).bind(tenantId).first()
 
     if (!tenant) {
         return c.json({ error: 'ไม่พบข้อมูลผู้เช่า' }, 404)
