@@ -8,7 +8,7 @@ const advances = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>(
 
 advances.use('/*', authMiddleware)
 
-advances.get('/contract/:contractId',
+advances.get('/:dormitoryId/contract/:contractId',
     requireDormitoryAccess,
     requireRole(['owner', 'manager']),
     async (c) => {
@@ -31,7 +31,8 @@ advances.get('/contract/:contractId',
     return c.json({ success: true, data: result.results })
 })
 
-advances.post('/',
+advances.post('/:dormitoryId',
+    requireDormitoryAccess,
     requireRole(['owner', 'manager']), 
     async (c) => {
     const db = c.env.DB

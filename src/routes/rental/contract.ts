@@ -77,7 +77,7 @@ contracts.get('/dormitories/:dormitoryId/:contractId',
     return c.json({ success: true, data: { ...contract, tenants: tenants.results } })
 })
 
-contracts.post('/',
+contracts.post('/:dormitoryId',
     requireDormitoryAccess,
     requireRole(['owner', 'manager']),      
     async (c) => {

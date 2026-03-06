@@ -100,7 +100,7 @@ tenants.get('/:id',
 
 // POST /api/rental/tenants
 // สร้างผู้เช่าใหม่
-tenants.post('/',
+tenants.post('/dormitories/:dormitoryId',
     requireDormitoryAccess,
     requireRole(['owner', 'manager']),  
     async (c) => {
@@ -152,5 +152,73 @@ tenants.post('/',
 
     return c.json({ success: true, data: tenant }, 201)
 })
+
+tenants.post(
+  '/dormitories/:dormitoryId/:contractId',
+  requireDormitoryAccess,
+  requireRole(['owner', 'manager']),
+  async (c) => {
+    const db = c.env.DB
+    const user = c.get('jwtPayload')
+    const contractId = c.req.param('contractId')
+
+    const contract = await db.prepare(`
+      SELECT c.id, f.dormitories_id
+      FROM contracts c
+      JOIN rooms r ON r.id = c.room_id
+      JOIN floors f ON f.id = r.floor_id
+      WHERE c.id = ?
+    `).bind(contractId).first()
+
+    if (!contract) {
+      return c.json({ error: 'ไม่พบสัญญา' }, 404)
+    }
+
+    const staff = await db.prepare(`
+      SELECT role FROM dormitory_users
+      WHERE dormitory_id = ? AND user_id = ?
+    `).bind(contract.dormitories_id, user.userId).first()
+
+    if (!staff) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+
+    const body = await c.req.json()
+    const { tenant_id, is_primary = 0 } = body
+
+    if (!tenant_id) {
+      return c.json({ error: 'กรุณาระบุ tenant_id' }, 400)
+    }
+
+    const tenant = await db.prepare(`SELECT id FROM tenants WHERE id = ?`).bind(tenant_id).first()
+    if (!tenant) {
+      return c.json({ error: 'ไม่พบข้อมูลผู้เช่า' }, 404)
+    }
+
+    const existing = await db.prepare(`
+      SELECT id FROM contract_tenants
+      WHERE contract_id = ? AND tenant_id = ?
+    `).bind(contractId, tenant_id).first()
+
+    if (existing) {
+      return c.json({ error: 'ผู้เช่านี้อยู่ในสัญญานี้แล้ว' }, 409)
+    }
+
+    if (is_primary === 1) {
+      await db.prepare(`
+        UPDATE contract_tenants SET is_primary = 0
+        WHERE contract_id = ?
+      `).bind(contractId).run()
+    }
+
+    const id = crypto.randomUUID()
+    await db.prepare(`
+      INSERT INTO contract_tenants (id, contract_id, tenant_id, is_primary)
+      VALUES (?, ?, ?, ?)
+    `).bind(id, contractId, tenant_id, is_primary).run()
+
+    return c.json({ success: true, data: { id, contract_id: contractId, tenant_id, is_primary } }, 201)
+  }
+)
 
 export default tenants
