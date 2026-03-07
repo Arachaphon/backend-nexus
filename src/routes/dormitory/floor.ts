@@ -9,13 +9,13 @@ const floors = new Hono<{ Bindings: { DB: D1Database } }>()
 
 floors.use('/*', authMiddleware)
 
-floors.get('/:id', 
+floors.get('/:dormitoryId', 
     requireDormitoryAccess,
     requireRole(['owner', 'manager']), 
     async (c) => {
     try {
         const db = c.env.DB;
-        const dormitoryId = c.req.param('id');
+        const dormitoryId = c.req.param('dormitoryId');
         
         const result = await db.prepare(
             `SELECT id, floor_number FROM floors WHERE dormitories_id = ? ORDER BY floor_number ASC`
@@ -27,12 +27,12 @@ floors.get('/:id',
     }
 });
 
-floors.post('/:id',
+floors.post('/:dormitoryId',
     requireGlobalRole(['landlord','owner']),
     async (c) => {
 
     const db = c.env.DB;
-    const dormitoryId = c.req.param('id');
+    const dormitoryId = c.req.param('dormitoryId')
     const { floors: floorList } = await c.req.json();
 
     if (!floorList || !Array.isArray(floorList)) {

@@ -43,13 +43,13 @@ main.get('/', async (c) => {
     }
 });
 
-main.get('/:id',
+main.get('/:dormitoryId',
     requireDormitoryAccess,  
     requireRole(['owner', 'manager']),
     async (c) => {
     try {
         const db = c.env.DB;
-        const dormitoryId = c.req.param('id');
+        const dormitoryId = c.req.param('dormitoryId');
         const userId = c.get('jwtPayload').userId;
 
         const dormitory = await db.prepare(`
@@ -68,13 +68,13 @@ main.get('/:id',
     }
 });
 
-main.get('/:id/stats', 
+main.get('/:dormitoryId/stats', 
     requireDormitoryAccess,
     requireRole(['owner', 'manager']), 
     async (c) => {
     try {
         const db = c.env.DB;
-        const dormitoryId = c.req.param('id');
+        const dormitoryId = c.req.param('dormitoryId');
         const userId = c.get('jwtPayload').userId;
 
         const stats = await db.prepare(`
