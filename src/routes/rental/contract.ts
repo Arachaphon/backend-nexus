@@ -215,34 +215,66 @@ contracts.patch(
   }
 )
 
-contracts.delete(
-  '/dormitories/:dormitoryId/contracts/:contractId',
+// PATCH /api/rentals/contracts/dormitories/:dormitoryId/contracts/:contractId/edit
+contracts.patch(
+  '/dormitories/:dormitoryId/contracts/:contractId/edit',
   requireDormitoryAccess,
   requireRole(['owner', 'manager']),
   async (c) => {
     const db = c.env.DB
     const contractId = c.req.param('contractId')
+    const body = await c.req.json()
 
-    const contract = await db.prepare(
-      `SELECT id, room_id FROM contracts WHERE id = ?`
-    ).bind(contractId).first<{ id: string; room_id: string }>()
+    const {
+      check_in_date,
+      check_out_date,
+      rent_price,
+      security_deposit,
+      security_deposit_type,
+      booking_fee,
+    } = body
 
-    if (!contract) {
-      return c.json({ error: 'ไม่พบสัญญา' }, 404)
+    if (!check_in_date || rent_price == null || security_deposit == null || !security_deposit_type) {
+      return c.json({ error: 'กรุณากรอกข้อมูลให้ครบ' }, 400)
+    }
+    if (!['เงินสด', 'โอนเงินธนาคาร'].includes(security_deposit_type)) {
+      return c.json({ error: 'security_deposit_type ไม่ถูกต้อง' }, 400)
     }
 
-    await db.prepare(
-      `DELETE FROM contracts WHERE id = ?`
-    ).bind(contractId).run()
+    const existing = await db.prepare(`SELECT id, room_id FROM contracts WHERE id = ?`)
+      .bind(contractId).first<{ id: string; room_id: string }>()
+    if (!existing) return c.json({ error: 'ไม่พบสัญญา' }, 404)
 
-    await db.prepare(
-      `UPDATE rooms SET status = 'vacant' WHERE id = ?`
-    ).bind(contract.room_id).run()
+    await db.prepare(`
+      UPDATE contracts SET
+        check_in_date = ?,
+        check_out_date = ?,
+        rent_price = ?,
+        security_deposit = ?,
+        security_deposit_type = ?,
+        booking_fee = ?
+      WHERE id = ?
+    `).bind(
+      check_in_date,
+      check_out_date ?? null,
+      rent_price,
+      security_deposit,
+      security_deposit_type,
+      booking_fee ?? 0,
+      contractId
+    ).run()
 
-    return c.json({ success: true, message: 'ยกเลิกสัญญาเรียบร้อย' })
+    await db.prepare(`UPDATE rooms SET current_rent_price = ? WHERE id = ?`)
+      .bind(rent_price, existing.room_id).run()
+
+    const updated = await db.prepare(`SELECT * FROM contracts WHERE id = ?`)
+      .bind(contractId).first()
+
+    return c.json({ success: true, data: updated })
   }
 )
 
+// DELETE /api/rentals/contracts/dormitories/:dormitoryId/contracts/:contractId
 contracts.delete(
   '/dormitories/:dormitoryId/contracts/:contractId',
   requireDormitoryAccess,
@@ -263,9 +295,7 @@ contracts.delete(
 
     const tenantIds = contractTenants.map((ct) => ct.tenant_id)
 
-    await db.prepare(
-      `DELETE FROM contracts WHERE id = ?`
-    ).bind(contractId).run()
+    await db.prepare(`DELETE FROM contracts WHERE id = ?`).bind(contractId).run()
 
     for (const tenantId of tenantIds) {
       const stillLinked = await db.prepare(
@@ -273,9 +303,7 @@ contracts.delete(
       ).bind(tenantId).first<{ cnt: number }>()
 
       if (!stillLinked || stillLinked.cnt === 0) {
-        await db.prepare(
-          `DELETE FROM tenants WHERE id = ?`
-        ).bind(tenantId).run()
+        await db.prepare(`DELETE FROM tenants WHERE id = ?`).bind(tenantId).run()
       }
     }
 
@@ -286,4 +314,5 @@ contracts.delete(
     return c.json({ success: true, message: 'ยกเลิกสัญญาและลบข้อมูลผู้เช่าเรียบร้อย' })
   }
 )
+
 export default contracts
