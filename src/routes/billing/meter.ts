@@ -2,31 +2,44 @@ import { Hono } from 'hono'
 import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../../utils/authMiddleware'
 import { requireDormitoryAccess } from '../../utils/dormitoryAccess'
+import { requireRole } from '../../utils/roleMiddleware'
 
 const meters = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
 meters.use('/*', authMiddleware)
 
-// GET /api/rental/meters/contract/:contractId
+meters.get('/:dormitoryId/contracts/:contractId',
+requireDormitoryAccess,
+requireRole(['owner','manager']),
+async (c) => {
 
-meters.get('/contract/:contractId',
-    async (c) => {
     const db = c.env.DB
     const contractId = c.req.param('contractId')
 
     const record = await db.prepare(`
-        SELECT * FROM meter_readings
-        WHERE contract_id = ? 
-    `).bind(contractId).first()
+        SELECT *
+        FROM meter_readings
+        WHERE contract_id = ?
+        ORDER BY reading_date DESC
+        LIMIT 1
+    `)
+    .bind(contractId)
+    .first()
 
     if (!record) {
-        return c.json({ error: 'ไม่พบข้อมูลมิเตอร์' }, 404)
+        return c.json({ error:'ไม่พบข้อมูลมิเตอร์' },404)
     }
 
-    return c.json({ success: true, data: record })
+    return c.json({
+        success:true,
+        data:record
+    })
 })
 
-meters.post('/', async (c) => {
+meters.post('/:dormitoryId',
+    requireDormitoryAccess,
+    requireRole(['owner', 'manager']), 
+    async (c) => {
     const db = c.env.DB
     const body = await c.req.json()
 
@@ -90,4 +103,36 @@ meters.post('/', async (c) => {
     return c.json({ success: true, data: record }, 201)
 })
 
+meters.patch('/:dormitoryId/contracts/:contractId',
+  requireDormitoryAccess,
+  requireRole(['owner', 'manager']),
+  async (c) => {
+    const db = c.env.DB
+    const contractId = c.req.param('contractId')
+    const body = await c.req.json()
+    const { water_unit_current, electric_unit_current } = body
+
+    if (water_unit_current == null || electric_unit_current == null) {
+      return c.json({ error: 'กรุณากรอกข้อมูลให้ครบ' }, 400)
+    }
+
+    const record = await db.prepare(
+      `SELECT id FROM meter_readings WHERE contract_id = ? ORDER BY reading_date DESC LIMIT 1`
+    ).bind(contractId).first<{ id: string }>()
+
+    if (!record) {
+      return c.json({ error: 'ไม่พบข้อมูลมิเตอร์' }, 404)
+    }
+
+    await db.prepare(
+      `UPDATE meter_readings SET water_unit_current = ?, electric_unit_current = ? WHERE id = ?`
+    ).bind(Number(water_unit_current), Number(electric_unit_current), record.id).run()
+
+    const updated = await db.prepare(
+      `SELECT * FROM meter_readings WHERE id = ?`
+    ).bind(record.id).first()
+
+    return c.json({ success: true, data: updated })
+  }
+)
 export default meters

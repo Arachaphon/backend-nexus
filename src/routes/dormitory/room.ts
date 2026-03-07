@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
-import { authMiddleware } from '../../utils/authMiddleware'
-import { requireRole } from '../../utils/roleMiddleware'
 import { D1Database } from '@cloudflare/workers-types'
+import { authMiddleware } from '../../utils/authMiddleware'
 import { requireDormitoryAccess } from '../../utils/dormitoryAccess'
+import { requireRole } from '../../utils/roleMiddleware'
+import { requireGlobalRole } from '../../utils/requireGlobalRole'
 
 const rooms = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
@@ -59,8 +60,7 @@ rooms.get('/:dormitoryId/:roomId',
    POST: สร้าง/แก้ไข floor + room
 ========================================================= */
 rooms.post('/:dormitoryId',
-  requireDormitoryAccess,
-  requireRole(['owner']),
+  requireGlobalRole(['landlord','owner']),
   async (c) => {
 
     const db = c.env.DB

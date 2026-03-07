@@ -2,13 +2,15 @@ import { Hono } from 'hono'
 import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../../utils/authMiddleware'
 import { requireDormitoryAccess } from '../../utils/dormitoryAccess'
+import { requireRole } from '../../utils/roleMiddleware'
 
 const advances = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
 advances.use('/*', authMiddleware)
 
-advances.get('/contract/:contractId',
-    requireDormitoryAccess, 
+advances.get('/:dormitoryId/contract/:contractId',
+    requireDormitoryAccess,
+    requireRole(['owner', 'manager']),
     async (c) => {
     const db = c.env.DB
     const contractId = c.req.param('contractId')
@@ -29,7 +31,10 @@ advances.get('/contract/:contractId',
     return c.json({ success: true, data: result.results })
 })
 
-advances.post('/', async (c) => {
+advances.post('/:dormitoryId',
+    requireDormitoryAccess,
+    requireRole(['owner', 'manager']), 
+    async (c) => {
     const db = c.env.DB
     const body = await c.req.json()
 

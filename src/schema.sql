@@ -13,6 +13,7 @@ CREATE TABLE profiles (
   email TEXT NOT NULL UNIQUE,
   phone_number TEXT,
   password TEXT NOT NULL,
+  global_role TEXT DEFAULT NULL CHECK (global_role IN ('landlord') OR global_role IS NULL),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -1,8 +1,10 @@
 import { Hono } from 'hono'
 import { D1Database } from '@cloudflare/workers-types'
 import { authMiddleware } from '../../utils/authMiddleware'
-import { requireRole } from '../../utils/roleMiddleware'
 import { requireDormitoryAccess } from '../../utils/dormitoryAccess'
+import { requireRole } from '../../utils/roleMiddleware'
+import { requireGlobalRole } from '../../utils/requireGlobalRole'
+
 const floors = new Hono<{ Bindings: { DB: D1Database } }>()
 
 floors.use('/*', authMiddleware)
@@ -26,8 +28,7 @@ floors.get('/:id',
 });
 
 floors.post('/:id',
-    requireDormitoryAccess,
-    requireRole(['owner']),
+    requireGlobalRole(['landlord','owner']),
     async (c) => {
 
     const db = c.env.DB;
