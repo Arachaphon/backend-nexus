@@ -221,4 +221,66 @@ tenants.post(
   }
 )
 
+tenants.patch('/dormitories/:dormitoryId/tenants/:tenantId',
+    requireDormitoryAccess,
+    requireRole(['owner', 'manager']),
+    async (c) => {
+    const db = c.env.DB
+    const tenantId = c.req.param('tenantId')
+
+    // ตรวจสอบว่า tenant มีอยู่จริง
+    const existing = await db.prepare(`SELECT id FROM tenants WHERE id = ?`).bind(tenantId).first()
+    if (!existing) {
+        return c.json({ error: 'ไม่พบข้อมูลผู้เช่า' }, 404)
+    }
+
+    const body = await c.req.json()
+
+    const {
+        first_name,
+        last_name,
+        phone_number,
+        id_card_or_passport,
+        address,
+        emergency_contact_name,
+        emergency_contact_relation,
+        emergency_contact_phone,
+        note,
+    } = body
+
+    // Validate required fields
+    if (!first_name || !last_name || !phone_number || !id_card_or_passport) {
+        return c.json({ error: 'กรุณากรอกข้อมูลที่จำเป็นให้ครบ' }, 400)
+    }
+
+    await db.prepare(`
+        UPDATE tenants SET
+            first_name = ?,
+            last_name = ?,
+            phone_number = ?,
+            id_card_or_passport = ?,
+            address = ?,
+            emergency_contact_name = ?,
+            emergency_contact_relation = ?,
+            emergency_contact_phone = ?,
+            note = ?
+        WHERE id = ?
+    `).bind(
+        first_name,
+        last_name,
+        phone_number,
+        id_card_or_passport,
+        address ?? null,
+        emergency_contact_name ?? null,
+        emergency_contact_relation ?? null,
+        emergency_contact_phone ?? null,
+        note ?? null,
+        tenantId
+    ).run()
+
+    const updated = await db.prepare(`SELECT * FROM tenants WHERE id = ?`).bind(tenantId).first()
+
+    return c.json({ success: true, data: updated })
+})
+
 export default tenants

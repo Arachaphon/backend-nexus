@@ -180,4 +180,110 @@ contracts.post('/:dormitoryId',
     }, 201)
 })
 
+contracts.patch(
+  '/dormitories/:dormitoryId/contracts/:contractId/checkout',
+  requireDormitoryAccess,
+  requireRole(['owner', 'manager']),
+  async (c) => {
+    const db = c.env.DB
+    const contractId = c.req.param('contractId')
+
+    const existing = await db.prepare(
+      `SELECT id FROM contracts WHERE id = ?`
+    ).bind(contractId).first()
+
+    if (!existing) {
+      return c.json({ error: 'ไม่พบสัญญา' }, 404)
+    }
+
+    const body = await c.req.json()
+    const { check_out_date } = body
+
+    if (!check_out_date) {
+      return c.json({ error: 'กรุณาระบุวันที่ย้ายออก' }, 400)
+    }
+
+    await db.prepare(
+      `UPDATE contracts SET check_out_date = ? WHERE id = ?`
+    ).bind(check_out_date, contractId).run()
+
+    const updated = await db.prepare(
+      `SELECT * FROM contracts WHERE id = ?`
+    ).bind(contractId).first()
+
+    return c.json({ success: true, data: updated })
+  }
+)
+
+contracts.delete(
+  '/dormitories/:dormitoryId/contracts/:contractId',
+  requireDormitoryAccess,
+  requireRole(['owner', 'manager']),
+  async (c) => {
+    const db = c.env.DB
+    const contractId = c.req.param('contractId')
+
+    const contract = await db.prepare(
+      `SELECT id, room_id FROM contracts WHERE id = ?`
+    ).bind(contractId).first<{ id: string; room_id: string }>()
+
+    if (!contract) {
+      return c.json({ error: 'ไม่พบสัญญา' }, 404)
+    }
+
+    await db.prepare(
+      `DELETE FROM contracts WHERE id = ?`
+    ).bind(contractId).run()
+
+    await db.prepare(
+      `UPDATE rooms SET status = 'vacant' WHERE id = ?`
+    ).bind(contract.room_id).run()
+
+    return c.json({ success: true, message: 'ยกเลิกสัญญาเรียบร้อย' })
+  }
+)
+
+contracts.delete(
+  '/dormitories/:dormitoryId/contracts/:contractId',
+  requireDormitoryAccess,
+  requireRole(['owner', 'manager']),
+  async (c) => {
+    const db = c.env.DB
+    const contractId = c.req.param('contractId')
+
+    const contract = await db.prepare(
+      `SELECT id, room_id FROM contracts WHERE id = ?`
+    ).bind(contractId).first<{ id: string; room_id: string }>()
+
+    if (!contract) return c.json({ error: 'ไม่พบสัญญา' }, 404)
+
+    const { results: contractTenants } = await db.prepare(
+      `SELECT tenant_id FROM contract_tenants WHERE contract_id = ?`
+    ).bind(contractId).all<{ tenant_id: string }>()
+
+    const tenantIds = contractTenants.map((ct) => ct.tenant_id)
+
+    await db.prepare(
+      `DELETE FROM contracts WHERE id = ?`
+    ).bind(contractId).run()
+
+    for (const tenantId of tenantIds) {
+      const stillLinked = await db.prepare(
+        `SELECT COUNT(*) as cnt FROM contract_tenants WHERE tenant_id = ?`
+      ).bind(tenantId).first<{ cnt: number }>()
+
+      if (!stillLinked || stillLinked.cnt === 0) {
+        await db.prepare(
+          `DELETE FROM tenants WHERE id = ?`
+        ).bind(tenantId).run()
+      }
+    }
+
+    await db.prepare(
+      `UPDATE rooms SET status = 'vacant', current_rent_price = 0 WHERE id = ?`
+    ).bind(contract.room_id).run()
+
+    return c.json({ success: true, message: 'ยกเลิกสัญญาและลบข้อมูลผู้เช่าเรียบร้อย' })
+  }
+)
 export default contracts
