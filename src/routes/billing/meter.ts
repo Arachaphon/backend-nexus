@@ -103,4 +103,36 @@ meters.post('/:dormitoryId',
     return c.json({ success: true, data: record }, 201)
 })
 
+meters.patch('/:dormitoryId/contracts/:contractId',
+  requireDormitoryAccess,
+  requireRole(['owner', 'manager']),
+  async (c) => {
+    const db = c.env.DB
+    const contractId = c.req.param('contractId')
+    const body = await c.req.json()
+    const { water_unit_current, electric_unit_current } = body
+
+    if (water_unit_current == null || electric_unit_current == null) {
+      return c.json({ error: 'กรุณากรอกข้อมูลให้ครบ' }, 400)
+    }
+
+    const record = await db.prepare(
+      `SELECT id FROM meter_readings WHERE contract_id = ? ORDER BY reading_date DESC LIMIT 1`
+    ).bind(contractId).first<{ id: string }>()
+
+    if (!record) {
+      return c.json({ error: 'ไม่พบข้อมูลมิเตอร์' }, 404)
+    }
+
+    await db.prepare(
+      `UPDATE meter_readings SET water_unit_current = ?, electric_unit_current = ? WHERE id = ?`
+    ).bind(Number(water_unit_current), Number(electric_unit_current), record.id).run()
+
+    const updated = await db.prepare(
+      `SELECT * FROM meter_readings WHERE id = ?`
+    ).bind(record.id).first()
+
+    return c.json({ success: true, data: updated })
+  }
+)
 export default meters
