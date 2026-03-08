@@ -10,7 +10,7 @@ advances.use('/*', authMiddleware)
 
 advances.get('/:dormitoryId/contract/:contractId',
     requireDormitoryAccess,
-    requireRole(['owner', 'manager']),
+    requireRole(['owner','manager','staff']),
     async (c) => {
     const db = c.env.DB
     const contractId = c.req.param('contractId')
@@ -33,7 +33,7 @@ advances.get('/:dormitoryId/contract/:contractId',
 
 advances.post('/:dormitoryId',
     requireDormitoryAccess,
-    requireRole(['owner', 'manager']), 
+    requireRole(['owner','manager','staff']),
     async (c) => {
     const db = c.env.DB
     const body = await c.req.json()

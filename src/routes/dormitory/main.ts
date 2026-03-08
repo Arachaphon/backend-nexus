@@ -45,7 +45,7 @@ main.get('/', async (c) => {
 
 main.get('/:dormitoryId',
     requireDormitoryAccess,  
-    requireRole(['owner', 'manager']),
+    requireRole(['owner','manager','staff']),
     async (c) => {
     try {
         const db = c.env.DB;
@@ -70,7 +70,7 @@ main.get('/:dormitoryId',
 
 main.get('/:dormitoryId/stats', 
     requireDormitoryAccess,
-    requireRole(['owner', 'manager']), 
+    requireRole(['owner','manager','staff']), 
     async (c) => {
     try {
         const db = c.env.DB;
@@ -108,7 +108,7 @@ main.get('/:dormitoryId/stats',
 });
 
 main.post('/',
-    requireGlobalRole(['landlord','owner']), 
+    requireGlobalRole(['user']), 
     async (c) => {
     try {
         const db = c.env.DB;
@@ -156,7 +156,7 @@ main.post('/',
 
 main.patch('/:dormitoryId',
     requireDormitoryAccess,
-    requireRole(['owner', 'manager']),
+    requireRole(['owner','manager']),
     async (c) => {
     try {
         const db = c.env.DB;

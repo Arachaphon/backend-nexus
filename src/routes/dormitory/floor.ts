@@ -11,7 +11,7 @@ floors.use('/*', authMiddleware)
 
 floors.get('/:dormitoryId', 
     requireDormitoryAccess,
-    requireRole(['owner', 'manager']), 
+    requireRole(['owner','manager','staff']), 
     async (c) => {
     try {
         const db = c.env.DB;
@@ -28,7 +28,7 @@ floors.get('/:dormitoryId',
 });
 
 floors.post('/:dormitoryId',
-    requireGlobalRole(['landlord','owner']),
+    requireGlobalRole(['user']),
     async (c) => {
 
     const db = c.env.DB;

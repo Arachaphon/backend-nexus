@@ -11,7 +11,7 @@ bills.use('/*', authMiddleware)
 /* GET ALL dormitory*/
 bills.get('/:dormitoryId/bills',
   requireDormitoryAccess,
-  requireRole(['owner', 'manager']),
+  requireRole(['owner','manager','staff']),
   async (c) => {
     const db = c.env.DB
     const dormitoryId = c.req.param('dormitoryId')
@@ -65,7 +65,7 @@ bills.get('/:dormitoryId/bills',
 /*GET BILL BY BILL ID */
 bills.get('/:dormitoryId/bills/:billId',
   requireDormitoryAccess,
-  requireRole(['owner', 'manager']),
+  requireRole(['owner','manager','staff']),
   async (c) => {
     const db = c.env.DB
     const dormitoryId = c.req.param('dormitoryId')

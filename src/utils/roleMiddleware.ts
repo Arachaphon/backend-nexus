@@ -1,11 +1,13 @@
 import { Context, Next } from 'hono'
 
-export function requireRole(roles: ('owner'|'manager')[]) {
+type DormRole = 'owner' | 'manager' | 'staff'
+
+export function requireRole(roles: DormRole[]) {
   return async (c: Context, next: Next) => {
 
-    const dormRole = c.get('dormRole')
+    const dormRole = c.get('dormRole') as DormRole
 
-    if (!roles.includes(dormRole)) {
+    if (!dormRole || !roles.includes(dormRole)) {
       return c.json({ error: 'Forbidden' }, 403)
     }
 

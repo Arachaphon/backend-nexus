@@ -10,7 +10,7 @@ meters.use('/*', authMiddleware)
 
 meters.get('/:dormitoryId/contracts/:contractId',
 requireDormitoryAccess,
-requireRole(['owner','manager']),
+requireRole(['owner','manager','staff']),
 async (c) => {
 
     const db = c.env.DB
@@ -38,7 +38,7 @@ async (c) => {
 
 meters.post('/:dormitoryId',
     requireDormitoryAccess,
-    requireRole(['owner', 'manager']), 
+    requireRole(['owner','manager','staff']),
     async (c) => {
     const db = c.env.DB
     const body = await c.req.json()
@@ -105,7 +105,7 @@ meters.post('/:dormitoryId',
 
 meters.patch('/:dormitoryId/contracts/:contractId',
   requireDormitoryAccess,
-  requireRole(['owner', 'manager']),
+  requireRole(['owner','manager','staff']),
   async (c) => {
     const db = c.env.DB
     const contractId = c.req.param('contractId')

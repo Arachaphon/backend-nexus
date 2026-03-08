@@ -1,33 +1,35 @@
 import { Context, Next } from 'hono'
+import { D1Database } from '@cloudflare/workers-types'
 
-export function requireGlobalRole(roles: ('landlord' | 'owner' | 'manager')[]) {
-  return async (c: Context, next: Next) => {
+type Env = {
+  Bindings: {
+    DB: D1Database
+  }
+}
+
+export const requireGlobalRole = (roles: string[]) => {
+  return async (c: Context<Env>, next: Next) => {
+
+    const payload = c.get('jwtPayload')
+    const userId = payload.userId
     const db = c.env.DB
-    const user = c.get('jwtPayload')
 
-    const profile = await db.prepare(`
-      SELECT global_role FROM profiles WHERE id = ?
-    `).bind(user.userId).first() as { global_role: string } | undefined
+    const user = await db.prepare(`
+      SELECT global_role
+      FROM profiles
+      WHERE id = ?
+    `)
+    .bind(userId)
+    .first<{ global_role: string }>()
 
-    const dormUser = await db.prepare(`
-      SELECT role FROM dormitory_users 
-      WHERE user_id = ? 
-      ORDER BY CASE role WHEN 'owner' THEN 1 WHEN 'manager' THEN 2 END
-      LIMIT 1
-    `).bind(user.userId).first() as { role: string } | undefined
-
-    const globalRole = profile?.global_role
-    const dormRole = dormUser?.role
-
-    const hasAccess = 
-      (globalRole && roles.includes(globalRole as any)) ||
-      (dormRole && roles.includes(dormRole as any))
-
-    if (!hasAccess) {
-      return c.json({ error: 'Forbidden' }, 403)
+    if (!user) {
+      return c.json({ success:false, message:'User not found' },404)
     }
 
-    c.set('globalRole', globalRole ?? dormRole)
+    if (!roles.includes(user.global_role)) {
+      return c.json({ success:false, message:'Forbidden' },403)
+    }
+
     await next()
   }
 }
