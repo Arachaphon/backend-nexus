@@ -86,7 +86,7 @@ staff.get('/',
 // )
 
 staff.post('/',                           
-  requireGlobalRole(['landlord', 'owner']),
+  requireGlobalRole(['user']),
   async (c) => {
   const db = c.env.DB
   const currentUser = c.get('jwtPayload')
@@ -124,8 +124,7 @@ staff.post('/',
 /**
  * PATCH STAFF
  */
-staff.patch('/:userId',
-  authMiddleware,                            
+staff.patch('/:userId',                         
   requireGlobalRole(['user']),
   async (c) => {
   const db = c.env.DB
@@ -194,8 +193,7 @@ staff.patch('/:userId',
 /**
  * DELETE STAFF
  */
-staff.delete('/:userId',
-  authMiddleware,                              
+staff.delete('/:userId',                         
   requireGlobalRole(['user']),
   async (c) => {
   const db = c.env.DB
