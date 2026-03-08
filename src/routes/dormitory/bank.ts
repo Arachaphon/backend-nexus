@@ -9,13 +9,13 @@ const banks = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
 banks.use('/*', authMiddleware)
 
-banks.get('/:id',
+banks.get('/:dormitoryId',
     requireDormitoryAccess,
     requireRole(['owner','manager']),
     async (c) => {
 
     const db = c.env.DB;
-    const dormId = c.req.param('id');
+    const dormId = c.req.param('dormitoryId');
 
     const { results } = await db.prepare(`
         SELECT id,
@@ -30,12 +30,12 @@ banks.get('/:id',
     return c.json({ success:true, data:results });
 });
 
-banks.post('/:id',
+banks.post('/:dormitoryId',
     requireGlobalRole(['landlord','owner']),
     async (c) => {
 
     const db = c.env.DB;
-    const dormId = c.req.param('id');
+    const dormId = c.req.param('dormitoryId');
     const body = await c.req.json();
 
     const { bank_name, account_number, bank_logo, account_name } = body;
@@ -62,13 +62,14 @@ banks.post('/:id',
     return c.json({ success:true, bank_id:bankId },201);
 });
 
-banks.patch('/payment-note/:id',
+
+banks.patch('/payment-note/:dormitoryId',
     requireDormitoryAccess,
     requireRole(['owner']),
     async (c) => {
 
     const db = c.env.DB;
-    const dormId = c.req.param('id');
+    const dormId = c.req.param('dormitoryId');
     const { payment_note } = await c.req.json();
 
     await db.prepare(`
