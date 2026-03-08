@@ -10,17 +10,25 @@ auth.post('/register', async (c) => {
     const { username, email, password, phoneNumber } = await c.req.json()
     const db = c.env.DB
 
+    const existing = await db.prepare(
+      `SELECT id FROM profiles WHERE email = ?`
+    ).bind(email).first()
+
+    if (existing) {
+      return c.json({ success: false, message: 'email นี้ถูกใช้งานแล้ว' }, 409)
+    }
+
     const hashed = await hashPassword(password)
 
     await db.prepare(`
-      INSERT INTO profiles (id, username, email, password, phone_number)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO profiles (id, username, email, password, phone_number, global_role)
+      VALUES (?, ?, ?, ?, ?, 'user')
     `).bind(
       crypto.randomUUID(),
       username,
       email,
       hashed,
-      phoneNumber
+      phoneNumber || null
     ).run()
 
     return c.json({ success: true }, 201)

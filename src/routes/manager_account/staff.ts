@@ -85,6 +85,7 @@ staff.get('/',
 //   }
 // )
 
+// POST — สร้าง account ใหม่ให้ staff, global_role = NULL เด็ดขาด
 staff.post('/',
   requireGlobalRole(['user']),
   async (c) => {
@@ -92,46 +93,88 @@ staff.post('/',
     const currentUser = c.get('jwtPayload')
 
     try {
-      const { email, role, dorm_ids } = await c.req.json()
+      const { username, email, password, phoneNumber, role, dorm_ids } = await c.req.json()
 
-      if (!email || !dorm_ids || dorm_ids.length === 0) {
-        return c.json({ success: false, message: 'กรุณาระบุ email และเลือกหอพักอย่างน้อย 1 แห่ง' }, 400)
+      if (!username || !email || !password || !dorm_ids || dorm_ids.length === 0) {
+        return c.json({ success: false, message: 'กรุณากรอกข้อมูลให้ครบและเลือกหอพักอย่างน้อย 1 แห่ง' }, 400)
       }
 
-      const profile = await db.prepare(`
-        SELECT id FROM profiles WHERE email = ?
-      `).bind(email).first()
+      const existing = await db.prepare(
+        `SELECT id FROM profiles WHERE email = ?`
+      ).bind(email).first()
 
-      if (!profile) {
-        return c.json({ success: false, message: 'ไม่พบผู้ใช้งานที่ลงทะเบียนด้วย email นี้' }, 404)
+      if (existing) {
+        return c.json({ success: false, message: 'email นี้ถูกใช้งานแล้ว' }, 409)
       }
 
-      const userId = profile.id as string
+      const userId = crypto.randomUUID()
+      const hashed = await hashPassword(password)
+      const stmts = []
 
-      if (userId === currentUser.userId) {
-        return c.json({ success: false, message: 'ไม่สามารถเพิ่มตัวเองได้' }, 400)
-      }
+      // global_role = NULL — staff ห้ามเข้า homemain
+      stmts.push(
+        db.prepare(`
+          INSERT INTO profiles (id, username, email, password, phone_number, global_role)
+          VALUES (?, ?, ?, ?, ?, NULL)
+        `).bind(userId, username, email, hashed, phoneNumber || null)
+      )
 
       for (const dormId of dorm_ids) {
-        const existing = await db.prepare(`
-          SELECT id FROM dormitory_users 
-          WHERE user_id = ? AND dormitory_id = ?
-        `).bind(userId, dormId).first()
-
-        if (existing) {
-          return c.json({ success: false, message: 'ผู้ใช้งานนี้มีอยู่ในหอพักนี้แล้ว' }, 409)
-        }
+        stmts.push(
+          db.prepare(`
+            INSERT INTO dormitory_users (id, dormitory_id, user_id, role, assigned_by)
+            VALUES (?, ?, ?, ?, ?)
+          `).bind(crypto.randomUUID(), dormId, userId, role || 'staff', currentUser.userId)
+        )
       }
-
-      const stmts = dorm_ids.map((dormId: string) =>
-        db.prepare(`
-          INSERT INTO dormitory_users (id, dormitory_id, user_id, role, assigned_by)
-          VALUES (?, ?, ?, ?, ?)
-        `).bind(crypto.randomUUID(), dormId, userId, role || 'staff', currentUser.userId)
-      )
 
       await db.batch(stmts)
       return c.json({ success: true }, 201)
+
+    } catch (err: any) {
+      return c.json({ success: false, message: err.message }, 500)
+    }
+  }
+)
+
+staff.delete('/:userId',
+  requireGlobalRole(['user']),
+  async (c) => {
+    const db = c.env.DB
+    const userId = c.req.param('userId')
+    const currentUser = c.get('jwtPayload')
+
+    if (currentUser.userId === userId) {
+      return c.json({ success: false, message: 'ไม่สามารถลบตัวเองได้' }, 400)
+    }
+
+    try {
+      const target = await db.prepare(
+        `SELECT global_role FROM profiles WHERE id = ?`
+      ).bind(userId).first<{ global_role: string | null }>()
+
+      if (!target) {
+        return c.json({ success: false, message: 'ไม่พบผู้ใช้งาน' }, 404)
+      }
+
+      if (target.global_role === null) {
+        // staff ที่ถูกสร้างโดย owner → ลบทิ้งทั้งหมด
+        await db.batch([
+          db.prepare(`DELETE FROM dormitory_users WHERE user_id = ?`).bind(userId),
+          db.prepare(`DELETE FROM profiles WHERE id = ?`).bind(userId)
+        ])
+      } else {
+        // owner/manager ที่สมัครเอง → ลบแค่ออกจากหอพักนี้
+        await db.prepare(`
+          DELETE FROM dormitory_users
+          WHERE user_id = ?
+          AND dormitory_id IN (
+            SELECT dormitory_id FROM dormitory_users WHERE user_id = ?
+          )
+        `).bind(userId, currentUser.userId).run()
+      }
+
+      return c.json({ success: true })
 
     } catch (err: any) {
       return c.json({ success: false, message: err.message }, 500)
