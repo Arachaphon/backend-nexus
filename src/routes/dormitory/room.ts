@@ -175,6 +175,33 @@ rooms.post('/:dormitoryId',
 )
 
 /* =========================================================
+   DELETE: ลบชั้น (cascade ลบห้องในชั้นด้วย)
+========================================================= */
+rooms.delete('/:dormitoryId/floor/:floorId',
+  requireDormitoryAccess,
+  requireRole(['owner', 'manager']),
+  async (c) => {
+    const db = c.env.DB
+    const dormitoryId = c.req.param('dormitoryId')
+    const floorId = c.req.param('floorId')
+
+    // ตรวจสอบว่า floor นี้เป็นของ dormitory นี้จริง
+    const floor = await db.prepare(`
+      SELECT id FROM floors WHERE id = ? AND dormitories_id = ?
+    `).bind(floorId, dormitoryId).first()
+
+    if (!floor) {
+      return c.json({ success: false, message: 'Floor not found' }, 404)
+    }
+
+    // ลบ floor (rooms cascade ตาม schema ON DELETE CASCADE)
+    await db.prepare(`DELETE FROM floors WHERE id = ?`).bind(floorId).run()
+
+    return c.json({ success: true })
+  }
+)
+
+/* =========================================================
    PATCH: อัปเดตราคา / สถานะ
 ========================================================= */
 rooms.patch('/:dormitoryId',
