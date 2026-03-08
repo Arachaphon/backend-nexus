@@ -12,7 +12,7 @@ profile.use('/*', authMiddleware)
  * GET MY PROFILE
  */
 profile.get('/', 
-  requireGlobalRole(['landlord']),
+  requireGlobalRole(['user']),
   async (c) => {
 
   const payload = c.get('jwtPayload')
@@ -32,7 +32,7 @@ profile.get('/',
  * UPDATE PROFILE
  */
 profile.patch('/',
-  requireGlobalRole(['landlord']),
+  requireGlobalRole(['user']),
   async (c) => {
 
   const payload = c.get('jwtPayload')
@@ -57,7 +57,7 @@ profile.patch('/',
  * CHANGE PASSWORD
  */
 profile.patch('/password',
-  requireGlobalRole(['landlord']),
+  requireGlobalRole(['user']),
   async (c) => {
 
   const payload = c.get('jwtPayload')
