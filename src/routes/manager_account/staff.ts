@@ -85,41 +85,59 @@ staff.get('/',
 //   }
 // )
 
-staff.post('/',                           
+staff.post('/',
   requireGlobalRole(['user']),
   async (c) => {
-  const db = c.env.DB
-  const currentUser = c.get('jwtPayload')
-  
-  try {
-    const { username, email, password, phoneNumber, role, dorm_ids } = await c.req.json()
+    const db = c.env.DB
+    const currentUser = c.get('jwtPayload')
 
-    if (!username || !dorm_ids || dorm_ids.length === 0) {
-       return c.json({ success: false, message: 'กรุณาเลือกหอพักอย่างน้อย 1 แห่ง' }, 400)
-    }
+    try {
+      const { email, role, dorm_ids } = await c.req.json()
 
-    const userId = crypto.randomUUID()
-    const hashed = await hashPassword(password)
-    const stmts = []
+      if (!email || !dorm_ids || dorm_ids.length === 0) {
+        return c.json({ success: false, message: 'กรุณาระบุ email และเลือกหอพักอย่างน้อย 1 แห่ง' }, 400)
+      }
 
-    stmts.push(
-      db.prepare(`INSERT INTO profiles (id, username, email, password, phone_number) VALUES (?, ?, ?, ?, ?)`)
-        .bind(userId, username, email, hashed, phoneNumber || null)
-    )
+      const profile = await db.prepare(`
+        SELECT id FROM profiles WHERE email = ?
+      `).bind(email).first()
 
-    for (const dormId of dorm_ids) {
-      stmts.push(
-        db.prepare(`INSERT INTO dormitory_users (id, dormitory_id, user_id, role, assigned_by) VALUES (?, ?, ?, ?, ?)`)
-          .bind(crypto.randomUUID(), dormId, userId, role || 'manager', currentUser.userId)
+      if (!profile) {
+        return c.json({ success: false, message: 'ไม่พบผู้ใช้งานที่ลงทะเบียนด้วย email นี้' }, 404)
+      }
+
+      const userId = profile.id as string
+
+      if (userId === currentUser.userId) {
+        return c.json({ success: false, message: 'ไม่สามารถเพิ่มตัวเองได้' }, 400)
+      }
+
+      for (const dormId of dorm_ids) {
+        const existing = await db.prepare(`
+          SELECT id FROM dormitory_users 
+          WHERE user_id = ? AND dormitory_id = ?
+        `).bind(userId, dormId).first()
+
+        if (existing) {
+          return c.json({ success: false, message: 'ผู้ใช้งานนี้มีอยู่ในหอพักนี้แล้ว' }, 409)
+        }
+      }
+
+      const stmts = dorm_ids.map((dormId: string) =>
+        db.prepare(`
+          INSERT INTO dormitory_users (id, dormitory_id, user_id, role, assigned_by)
+          VALUES (?, ?, ?, ?, ?)
+        `).bind(crypto.randomUUID(), dormId, userId, role || 'staff', currentUser.userId)
       )
-    }
 
-    await db.batch(stmts)
-    return c.json({ success: true }, 201)
-  } catch (err: any) {
-    return c.json({ success: false, message: err.message }, 500)
+      await db.batch(stmts)
+      return c.json({ success: true }, 201)
+
+    } catch (err: any) {
+      return c.json({ success: false, message: err.message }, 500)
+    }
   }
-})
+)
 
 /**
  * PATCH STAFF
