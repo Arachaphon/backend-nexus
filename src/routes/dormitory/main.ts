@@ -154,4 +154,74 @@ main.post('/',
     }
 });
 
+main.patch('/:dormitoryId',
+    requireDormitoryAccess,
+    requireRole(['owner', 'manager']),
+    async (c) => {
+    try {
+        const db = c.env.DB;
+        const dormitoryId = c.req.param('dormitoryId');
+        const body = await c.req.json();
+
+        // ดึงข้อมูลเดิมก่อน เพื่อ merge กับค่าที่ส่งมา
+        const existing = await db.prepare(`
+            SELECT * FROM dormitories WHERE id = ?
+        `).bind(dormitoryId).first();
+
+        if (!existing) {
+            return c.json({ success: false, message: "ไม่พบข้อมูลหอพัก" }, 404);
+        }
+
+        // Validate due_date range ถ้ามีการส่งมา
+        if (body.due_date !== undefined) {
+            const due = Number(body.due_date);
+            if (isNaN(due) || due < 1 || due > 31) {
+                return c.json({ success: false, message: "due_date ต้องเป็นตัวเลข 1-31" }, 400);
+            }
+        }
+
+        // Validate fine_per_day ถ้ามีการส่งมา
+        if (body.fine_per_day !== undefined) {
+            const fine = Number(body.fine_per_day);
+            if (isNaN(fine) || fine < 0) {
+                return c.json({ success: false, message: "fine_per_day ต้องเป็นตัวเลขที่ไม่ติดลบ" }, 400);
+            }
+        }
+
+        // Merge: ใช้ค่าใหม่ถ้ามี ไม่อย่างนั้นใช้ค่าเดิม
+        const name          = body.name          ?? existing.name;
+        const address       = body.address       ?? existing.address;
+        const phone_number  = body.phone_number  ?? existing.phone_number;
+        const tax_id       = 'tax_id'       in body ? (body.tax_id ?? null)       : existing.tax_id;
+        const due_date      = body.due_date      ?? existing.due_date;
+        const fine_per_day  = body.fine_per_day  ?? existing.fine_per_day;
+        const payment_note = 'payment_note' in body ? (body.payment_note ?? null) : existing.payment_note;
+
+        await db.prepare(`
+            UPDATE dormitories
+            SET
+                name          = ?,
+                address       = ?,
+                phone_number  = ?,
+                tax_id        = ?,
+                due_date      = ?,
+                fine_per_day  = ?,
+                payment_note  = ?,
+                updated_at    = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `)
+        .bind(name, address, phone_number, tax_id, due_date, fine_per_day, payment_note, dormitoryId)
+        .run();
+
+        const updated = await db.prepare(`
+            SELECT * FROM dormitories WHERE id = ?
+        `).bind(dormitoryId).first();
+
+        return c.json({ success: true, data: updated });
+
+    } catch (err: any) {
+        return c.json({ success: false, message: err.message }, 500);
+    }
+});
+
 export default main;
