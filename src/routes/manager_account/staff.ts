@@ -111,11 +111,10 @@ staff.post('/',
       const hashed = await hashPassword(password)
       const stmts = []
 
-      // global_role = NULL — staff ห้ามเข้า homemain
       stmts.push(
         db.prepare(`
           INSERT INTO profiles (id, username, email, password, phone_number, global_role)
-          VALUES (?, ?, ?, ?, ?, NULL)
+          VALUES (?, ?, ?, ?, ?, 'staff')
         `).bind(userId, username, email, hashed, phoneNumber || null)
       )
 
@@ -151,20 +150,18 @@ staff.delete('/:userId',
     try {
       const target = await db.prepare(
         `SELECT global_role FROM profiles WHERE id = ?`
-      ).bind(userId).first<{ global_role: string | null }>()
+      ).bind(userId).first<{ global_role: string }>()
 
       if (!target) {
         return c.json({ success: false, message: 'ไม่พบผู้ใช้งาน' }, 404)
       }
 
-      if (target.global_role === null) {
-        // staff ที่ถูกสร้างโดย owner → ลบทิ้งทั้งหมด
+      if (target.global_role === 'staff') {
         await db.batch([
           db.prepare(`DELETE FROM dormitory_users WHERE user_id = ?`).bind(userId),
           db.prepare(`DELETE FROM profiles WHERE id = ?`).bind(userId)
         ])
       } else {
-        // owner/manager ที่สมัครเอง → ลบแค่ออกจากหอพักนี้
         await db.prepare(`
           DELETE FROM dormitory_users
           WHERE user_id = ?
@@ -181,7 +178,6 @@ staff.delete('/:userId',
     }
   }
 )
-
 /**
  * PATCH STAFF
  */
