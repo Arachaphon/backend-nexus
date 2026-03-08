@@ -12,7 +12,7 @@ tenants.use('/*', authMiddleware)
 tenants.get(
   '/dormitories/:dormitoryId',
   requireDormitoryAccess,
-  requireRole(['owner', 'manager']), 
+  requireRole(['owner','manager','staff']), 
   async (c) => {
     try {
         const db = c.env.DB
@@ -49,7 +49,7 @@ tenants.get(
 tenants.get(
   '/dormitories/:dormitoryId/rooms/:roomId',
   requireDormitoryAccess,
-  requireRole(['owner', 'manager']), 
+  requireRole(['owner','manager','staff']),
   async (c) => {
     const db = c.env.DB
     const roomId = c.req.param('roomId')
@@ -84,7 +84,7 @@ tenants.get(
 // ดึงข้อมูลผู้เช่า
 tenants.get('/dormitories/:dormitoryId/tenants/:tenantId',
     requireDormitoryAccess,
-    requireRole(['owner', 'manager']),  
+    requireRole(['owner','manager','staff']),  
     async (c) => {
     const db = c.env.DB
     const tenantId = c.req.param('tenantId')
@@ -102,7 +102,7 @@ tenants.get('/dormitories/:dormitoryId/tenants/:tenantId',
 // สร้างผู้เช่าใหม่
 tenants.post('/dormitories/:dormitoryId',
     requireDormitoryAccess,
-    requireRole(['owner', 'manager']),  
+    requireRole(['owner','manager','staff']), 
     async (c) => {
     const db = c.env.DB
     const body = await c.req.json()
@@ -156,7 +156,7 @@ tenants.post('/dormitories/:dormitoryId',
 tenants.post(
   '/dormitories/:dormitoryId/:contractId',
   requireDormitoryAccess,
-  requireRole(['owner', 'manager']),
+  requireRole(['owner','manager','staff']),
   async (c) => {
     const db = c.env.DB
     const user = c.get('jwtPayload')
@@ -223,7 +223,7 @@ tenants.post(
 
 tenants.patch('/dormitories/:dormitoryId/tenants/:tenantId',
     requireDormitoryAccess,
-    requireRole(['owner', 'manager']),
+    requireRole(['owner','manager','staff']),
     async (c) => {
     const db = c.env.DB
     const tenantId = c.req.param('tenantId')

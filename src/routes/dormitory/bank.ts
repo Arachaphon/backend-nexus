@@ -11,7 +11,7 @@ banks.use('/*', authMiddleware)
 
 banks.get('/:dormitoryId',
     requireDormitoryAccess,
-    requireRole(['owner','manager']),
+    requireRole(['owner','manager','staff']),
     async (c) => {
 
     const db = c.env.DB;
@@ -31,7 +31,7 @@ banks.get('/:dormitoryId',
 });
 
 banks.post('/:dormitoryId',
-    requireGlobalRole(['landlord','owner']),
+    requireGlobalRole(['user']),
     async (c) => {
 
     const db = c.env.DB;
@@ -65,7 +65,7 @@ banks.post('/:dormitoryId',
 
 banks.patch('/payment-note/:dormitoryId',
     requireDormitoryAccess,
-    requireRole(['owner']),
+    requireRole(['owner','manager']),
     async (c) => {
 
     const db = c.env.DB;
@@ -83,7 +83,7 @@ banks.patch('/payment-note/:dormitoryId',
 
 banks.delete('/:dormitoryId/:bankId',
   requireDormitoryAccess,
-  requireRole(['owner']),
+  requireRole(['owner','manager']),
   async (c) => {
     const db = c.env.DB;
     const bankId = c.req.param('bankId');
