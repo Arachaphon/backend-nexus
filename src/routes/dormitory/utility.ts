@@ -9,12 +9,12 @@ const utilities = new Hono<{ Bindings: { DB: D1Database } }>()
 
 utilities.use('/*', authMiddleware)
 
-utilities.post('/:id',
+utilities.post('/:dormitoryId',
     requireGlobalRole(['landlord','owner']), 
     async (c) => {
     try {
         const db = c.env.DB;
-        const dormitoryId = c.req.param('id');
+        const dormitoryId = c.req.param('dormitoryId');
         const body = await c.req.json();
         const { water, electric } = body;
         const validTypes = ['meter_actual', 'meter_min', 'flat_rate'];
