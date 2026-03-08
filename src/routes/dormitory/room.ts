@@ -14,7 +14,7 @@ rooms.use('*', authMiddleware)
 ========================================================= */
 rooms.get('/:dormitoryId',
   requireDormitoryAccess,
-  requireRole(['owner','manager']),
+  requireRole(['owner','manager','staff']),
   async (c) => {
 
     const db = c.env.DB
@@ -35,7 +35,7 @@ rooms.get('/:dormitoryId',
 ========================================================= */
 rooms.get('/:dormitoryId/:roomId',
   requireDormitoryAccess,
-  requireRole(['owner','manager']),
+  requireRole(['owner','manager','staff']),
   async (c) => {
 
     const db = c.env.DB
@@ -60,7 +60,7 @@ rooms.get('/:dormitoryId/:roomId',
    POST: สร้าง/แก้ไข floor + room
 ========================================================= */
 rooms.post('/:dormitoryId',
-  requireGlobalRole(['landlord','owner']),
+  requireGlobalRole(['user']),
   async (c) => {
 
     const db = c.env.DB
@@ -179,7 +179,8 @@ rooms.post('/:dormitoryId',
 ========================================================= */
 rooms.patch('/:dormitoryId',
   requireDormitoryAccess,
-  requireRole(['owner']),
+  requireRole(['owner','manager']),
+
   async (c) => {
 
     const db = c.env.DB

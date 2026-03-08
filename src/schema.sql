@@ -13,7 +13,8 @@ CREATE TABLE profiles (
   email TEXT NOT NULL UNIQUE,
   phone_number TEXT,
   password TEXT NOT NULL,
-  global_role TEXT DEFAULT NULL CHECK (global_role IN ('landlord') OR global_role IS NULL),
+  global_role TEXT DEFAULT 'user' 
+    CHECK (global_role IN ('user','admin'))
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -35,7 +36,7 @@ CREATE TABLE dormitory_users (
     id TEXT PRIMARY KEY,
     dormitory_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
-    role TEXT NOT NULL CHECK(role IN ('owner','manager')),
+    role TEXT NOT NULL CHECK(role IN ('owner','manager','staff')),
     assigned_by TEXT,
     assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 

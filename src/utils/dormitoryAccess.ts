@@ -1,32 +1,51 @@
 import { Context, Next } from 'hono'
+import { D1Database } from '@cloudflare/workers-types'
 
-export const requireDormitoryAccess = async (c: Context, next: Next) => {
-  const db = c.env.DB
-  const user = c.get('jwtPayload')
-
-  if (!user) {
-    return c.json({ error: 'Unauthorized' }, 401)
+export type AppEnv = {
+  Bindings: {
+    DB: D1Database
   }
+  Variables: {
+    jwtPayload: {
+      userId: string
+      email?: string
+    }
+    dormRole: 'owner' | 'manager' | 'staff'
+  }
+}
 
+export const requireDormitoryAccess = async (
+  c: Context<AppEnv>,
+  next: Next
+) => {
+
+  const db = c.env.DB
+  const payload = c.get('jwtPayload')
+
+  const userId = payload.userId
   const dormitoryId = c.req.param('dormitoryId')
 
-  if (!dormitoryId) {
-    return c.json({ error: 'Dormitory ID required' }, 400)
-  }
-
-  const staff = await db.prepare(`
-      SELECT role FROM dormitory_users
+  const access = await db
+    .prepare(`
+      SELECT role
+      FROM dormitory_users
       WHERE dormitory_id = ?
       AND user_id = ?
-  `)
-  .bind(dormitoryId, user.userId)
-  .first()
+    `)
+    .bind(dormitoryId, userId)
+    .first<{ role: 'owner' | 'manager' | 'staff' }>()
 
-  if (!staff) {
-    return c.json({ error: 'Forbidden' }, 403)
+  if (!access) {
+    return c.json(
+      {
+        success: false,
+        message: 'No access to this dormitory',
+      },
+      403
+    )
   }
 
-  c.set('dormRole', staff.role)
+  c.set('dormRole', access.role)
 
   await next()
 }

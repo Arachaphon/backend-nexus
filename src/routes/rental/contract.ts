@@ -11,7 +11,7 @@ contracts.use('/*', authMiddleware)
 // GET /api/rentals/contracts/dormitories/:dormitoryId
 contracts.get('/dormitories/:dormitoryId', 
     requireDormitoryAccess, 
-    requireRole(['owner', 'manager']),
+    requireRole(['owner','manager','staff']),
     async (c) => {
     const db = c.env.DB
     const dormitoryId = c.req.param('dormitoryId')
@@ -33,7 +33,7 @@ contracts.get('/dormitories/:dormitoryId',
 contracts.get(
 '/dormitories/:dormitoryId/rooms/:roomId',
 requireDormitoryAccess,
-requireRole(['owner','manager']),
+requireRole(['owner','manager','staff']),
 async (c) => {
 
     const db = c.env.DB
@@ -57,7 +57,7 @@ async (c) => {
 // GET /api/rental/contracts/:contractId
 contracts.get('/dormitories/:dormitoryId/:contractId',
     requireDormitoryAccess,
-    requireRole(['owner', 'manager']),
+    requireRole(['owner','manager','staff']),
     async (c) => {
     const db = c.env.DB
     const contractId = c.req.param('contractId')
@@ -79,7 +79,7 @@ contracts.get('/dormitories/:dormitoryId/:contractId',
 
 contracts.post('/:dormitoryId',
     requireDormitoryAccess,
-    requireRole(['owner', 'manager']),      
+    requireRole(['owner','manager','staff']),      
     async (c) => {
     const db = c.env.DB
     const body = await c.req.json()
@@ -183,7 +183,7 @@ contracts.post('/:dormitoryId',
 contracts.patch(
   '/dormitories/:dormitoryId/contracts/:contractId/checkout',
   requireDormitoryAccess,
-  requireRole(['owner', 'manager']),
+  requireRole(['owner','manager','staff']),
   async (c) => {
     const db = c.env.DB
     const contractId = c.req.param('contractId')
@@ -219,7 +219,7 @@ contracts.patch(
 contracts.patch(
   '/dormitories/:dormitoryId/contracts/:contractId/edit',
   requireDormitoryAccess,
-  requireRole(['owner', 'manager']),
+  requireRole(['owner','manager','staff']),
   async (c) => {
     const db = c.env.DB
     const contractId = c.req.param('contractId')
@@ -278,7 +278,7 @@ contracts.patch(
 contracts.delete(
   '/dormitories/:dormitoryId/contracts/:contractId',
   requireDormitoryAccess,
-  requireRole(['owner', 'manager']),
+  requireRole(['owner','manager','staff']),
   async (c) => {
     const db = c.env.DB
     const contractId = c.req.param('contractId')

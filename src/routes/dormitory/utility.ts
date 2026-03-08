@@ -10,7 +10,7 @@ const utilities = new Hono<{ Bindings: { DB: D1Database } }>()
 utilities.use('/*', authMiddleware)
 
 utilities.post('/:dormitoryId',
-    requireGlobalRole(['landlord','owner']), 
+    requireGlobalRole(['user']), 
     async (c) => {
     try {
         const db = c.env.DB;
