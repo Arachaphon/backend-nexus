@@ -7,6 +7,8 @@ import ownerStaffRoutes from './routes/manager_account/staff'
 import rentalRoutes from './routes/rental/index'
 import meterRoutes from './routes/billing/meter'
 import billRoutes from './routes/billing/bills'
+import repairRoutes from './routes/billing/repair'
+
 const app = new Hono()
 
 app.use('*', cors())
@@ -18,5 +20,6 @@ app.route('/api/staff', ownerStaffRoutes)
 app.route('/api/rentals', rentalRoutes)
 app.route('/api/meters', meterRoutes)
 app.route('/api/bills', billRoutes)
+app.route('/api/repairs', repairRoutes)
 
 export default app

@@ -10,7 +10,7 @@ const rooms = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 rooms.use('*', authMiddleware)
 
 /* =========================================================
-   GET: ห้องทั้งหมดของหอ
+   GET: ห้องทั้งหมดของหอ (รวม floor_number)
 ========================================================= */
 rooms.get('/:dormitoryId',
   requireDormitoryAccess,
@@ -21,10 +21,11 @@ rooms.get('/:dormitoryId',
     const dormitoryId = c.req.param('dormitoryId')
 
     const { results } = await db.prepare(`
-      SELECT r.*
+      SELECT r.*, f.floor_number
       FROM rooms r
       JOIN floors f ON r.floor_id = f.id
       WHERE f.dormitories_id = ?
+      ORDER BY f.floor_number ASC, r.room_number ASC
     `).bind(dormitoryId).all()
 
     return c.json({ success:true, data:results })
@@ -43,7 +44,7 @@ rooms.get('/:dormitoryId/:roomId',
     const roomId = c.req.param('roomId')
 
     const room = await db.prepare(`
-      SELECT r.*
+      SELECT r.*, f.floor_number
       FROM rooms r
       JOIN floors f ON r.floor_id = f.id
       WHERE r.id = ? AND f.dormitories_id = ?
@@ -185,7 +186,6 @@ rooms.delete('/:dormitoryId/floor/:floorId',
     const dormitoryId = c.req.param('dormitoryId')
     const floorId = c.req.param('floorId')
 
-    // ตรวจสอบว่า floor นี้เป็นของ dormitory นี้จริง
     const floor = await db.prepare(`
       SELECT id FROM floors WHERE id = ? AND dormitories_id = ?
     `).bind(floorId, dormitoryId).first()
@@ -194,7 +194,6 @@ rooms.delete('/:dormitoryId/floor/:floorId',
       return c.json({ success: false, message: 'Floor not found' }, 404)
     }
 
-    // ลบ floor (rooms cascade ตาม schema ON DELETE CASCADE)
     await db.prepare(`DELETE FROM floors WHERE id = ?`).bind(floorId).run()
 
     return c.json({ success: true })

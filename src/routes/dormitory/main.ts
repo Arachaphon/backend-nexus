@@ -5,16 +5,14 @@ import { requireDormitoryAccess } from '../../utils/dormitoryAccess'
 import { requireRole } from '../../utils/roleMiddleware'
 import { requireGlobalRole } from '../../utils/requireGlobalRole'
 
-
 const main = new Hono<{ Bindings: { DB: D1Database, JWT_SECRET: string } }>()
 
 main.use('/*', authMiddleware)
 
 main.get('/', async (c) => {
     try {
-        const db = c.env.DB;
-        const payload = c.get('jwtPayload');
-        const userId = c.get('jwtPayload').userId;
+        const db = c.env.DB
+        const userId = c.get('jwtPayload').userId
 
         const { results } = await db.prepare(`
             SELECT 
@@ -31,51 +29,57 @@ main.get('/', async (c) => {
                     FROM rooms r 
                     JOIN floors f ON r.floor_id = f.id 
                     WHERE f.dormitories_id = d.id AND r.status = 'vacant'
-                ) as vacant_rooms
+                ) as vacant_rooms,
+                (
+                    SELECT COUNT(b.id)
+                    FROM bills b
+                    JOIN rooms r ON b.room_id = r.id
+                    JOIN floors f ON r.floor_id = f.id
+                    WHERE f.dormitories_id = d.id
+                    AND strftime('%Y-%m', b.bill_date) = strftime('%Y-%m','now')
+                ) as monthly_bills
             FROM dormitories d
             JOIN dormitory_users du ON du.dormitory_id = d.id
             WHERE du.user_id = ?
-        `).bind(userId).all();
+        `).bind(userId).all()
 
-        return c.json({ success: true, data: results });
+        return c.json({ success: true, data: results })
     } catch (err: any) {
-        return c.json({ success: false, message: err.message }, 500);
+        return c.json({ success: false, message: err.message }, 500)
     }
-});
+})
 
 main.get('/:dormitoryId',
-    requireDormitoryAccess,  
+    requireDormitoryAccess,
     requireRole(['owner','manager','staff']),
     async (c) => {
     try {
-        const db = c.env.DB;
-        const dormitoryId = c.req.param('dormitoryId');
-        const userId = c.get('jwtPayload').userId;
+        const db = c.env.DB
+        const dormitoryId = c.req.param('dormitoryId')
 
         const dormitory = await db.prepare(`
-            SELECT * FROM dormitories WHERE id = ? 
+            SELECT * FROM dormitories WHERE id = ?
         `)
         .bind(dormitoryId)
-        .first(); 
+        .first()
 
         if (!dormitory) {
-            return c.json({ success: false, message: "ไม่พบข้อมูลหอพัก" }, 404);
+            return c.json({ success: false, message: "ไม่พบข้อมูลหอพัก" }, 404)
         }
 
-        return c.json(dormitory);
+        return c.json(dormitory)
     } catch (err: any) {
-        return c.json({ success: false, message: err.message }, 500);
+        return c.json({ success: false, message: err.message }, 500)
     }
-});
+})
 
-main.get('/:dormitoryId/stats', 
+main.get('/:dormitoryId/stats',
     requireDormitoryAccess,
-    requireRole(['owner','manager','staff']), 
+    requireRole(['owner','manager','staff']),
     async (c) => {
     try {
-        const db = c.env.DB;
-        const dormitoryId = c.req.param('dormitoryId');
-        const userId = c.get('jwtPayload').userId;
+        const db = c.env.DB
+        const dormitoryId = c.req.param('dormitoryId')
 
         const stats = await db.prepare(`
             SELECT 
@@ -92,7 +96,8 @@ main.get('/:dormitoryId/stats',
             FROM rooms r
             JOIN floors f ON r.floor_id = f.id
             WHERE f.dormitories_id = ?
-        `).bind(dormitoryId, dormitoryId).first();
+        `).bind(dormitoryId, dormitoryId).first()
+
         return c.json({
             success: true,
             data: {
@@ -101,23 +106,22 @@ main.get('/:dormitoryId/stats',
                 occupied: stats?.occupied_rooms ?? 0,
                 pending: stats?.pending_payments ?? 0
             }
-        });
+        })
     } catch (err: any) {
-        return c.json({ success: false, message: err.message }, 500);
+        return c.json({ success: false, message: err.message }, 500)
     }
-});
+})
 
 main.post('/',
-    requireGlobalRole(['user']), 
+    requireGlobalRole(['user']),
     async (c) => {
     try {
-        const db = c.env.DB;
-        const body = await c.req.json();
-        const userId = c.get('jwtPayload').userId;
+        const db = c.env.DB
+        const body = await c.req.json()
+        const userId = c.get('jwtPayload').userId
 
-        const dormitoryId = crypto.randomUUID();
+        const dormitoryId = crypto.randomUUID()
 
-        // 1️⃣ สร้าง dormitory
         await db.prepare(`
             INSERT INTO dormitories (
                 id, name, address, phone_number, tax_id, due_date, fine_per_day
@@ -132,9 +136,8 @@ main.post('/',
             body.due_date,
             body.fine_per_day
         )
-        .run();
+        .run()
 
-        // 2️⃣ เพิ่ม owner คนแรก
         await db.prepare(`
             INSERT INTO dormitory_users (
                 id, dormitory_id, user_id, role
@@ -145,83 +148,79 @@ main.post('/',
             dormitoryId,
             userId
         )
-        .run();
+        .run()
 
-        return c.json({ success: true, dormitory_id: dormitoryId }, 201);
+        return c.json({ success: true, dormitory_id: dormitoryId }, 201)
 
     } catch (err: any) {
-        return c.json({ success: false, message: err.message }, 500);
+        return c.json({ success: false, message: err.message }, 500)
     }
-});
+})
 
 main.patch('/:dormitoryId',
     requireDormitoryAccess,
     requireRole(['owner','manager']),
     async (c) => {
     try {
-        const db = c.env.DB;
-        const dormitoryId = c.req.param('dormitoryId');
-        const body = await c.req.json();
+        const db = c.env.DB
+        const dormitoryId = c.req.param('dormitoryId')
+        const body = await c.req.json()
 
-        // ดึงข้อมูลเดิมก่อน เพื่อ merge กับค่าที่ส่งมา
         const existing = await db.prepare(`
             SELECT * FROM dormitories WHERE id = ?
-        `).bind(dormitoryId).first();
+        `).bind(dormitoryId).first()
 
         if (!existing) {
-            return c.json({ success: false, message: "ไม่พบข้อมูลหอพัก" }, 404);
+            return c.json({ success: false, message: "ไม่พบข้อมูลหอพัก" }, 404)
         }
 
-        // Validate due_date range ถ้ามีการส่งมา
         if (body.due_date !== undefined) {
-            const due = Number(body.due_date);
+            const due = Number(body.due_date)
             if (isNaN(due) || due < 1 || due > 31) {
-                return c.json({ success: false, message: "due_date ต้องเป็นตัวเลข 1-31" }, 400);
+                return c.json({ success: false, message: "due_date ต้องเป็นตัวเลข 1-31" }, 400)
             }
         }
 
-        // Validate fine_per_day ถ้ามีการส่งมา
         if (body.fine_per_day !== undefined) {
-            const fine = Number(body.fine_per_day);
+            const fine = Number(body.fine_per_day)
             if (isNaN(fine) || fine < 0) {
-                return c.json({ success: false, message: "fine_per_day ต้องเป็นตัวเลขที่ไม่ติดลบ" }, 400);
+                return c.json({ success: false, message: "fine_per_day ต้องเป็นตัวเลขที่ไม่ติดลบ" }, 400)
             }
         }
 
-        // Merge: ใช้ค่าใหม่ถ้ามี ไม่อย่างนั้นใช้ค่าเดิม
-        const name          = body.name          ?? existing.name;
-        const address       = body.address       ?? existing.address;
-        const phone_number  = body.phone_number  ?? existing.phone_number;
-        const tax_id       = 'tax_id'       in body ? (body.tax_id ?? null)       : existing.tax_id;
-        const due_date      = body.due_date      ?? existing.due_date;
-        const fine_per_day  = body.fine_per_day  ?? existing.fine_per_day;
-        const payment_note = 'payment_note' in body ? (body.payment_note ?? null) : existing.payment_note;
+        const name = body.name ?? existing.name
+        const address = body.address ?? existing.address
+        const phone_number = body.phone_number ?? existing.phone_number
+        const tax_id = 'tax_id' in body ? (body.tax_id ?? null) : existing.tax_id
+        const due_date = body.due_date ?? existing.due_date
+        const fine_per_day = body.fine_per_day ?? existing.fine_per_day
+        const payment_note = 'payment_note' in body ? (body.payment_note ?? null) : existing.payment_note
 
         await db.prepare(`
             UPDATE dormitories
             SET
-                name          = ?,
-                address       = ?,
-                phone_number  = ?,
-                tax_id        = ?,
-                due_date      = ?,
-                fine_per_day  = ?,
-                payment_note  = ?,
-                updated_at    = CURRENT_TIMESTAMP
+                name = ?,
+                address = ?,
+                phone_number = ?,
+                tax_id = ?,
+                due_date = ?,
+                fine_per_day = ?,
+                payment_note = ?,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         `)
         .bind(name, address, phone_number, tax_id, due_date, fine_per_day, payment_note, dormitoryId)
-        .run();
+        .run()
 
         const updated = await db.prepare(`
             SELECT * FROM dormitories WHERE id = ?
-        `).bind(dormitoryId).first();
+        `).bind(dormitoryId).first()
 
-        return c.json({ success: true, data: updated });
+        return c.json({ success: true, data: updated })
 
     } catch (err: any) {
-        return c.json({ success: false, message: err.message }, 500);
+        return c.json({ success: false, message: err.message }, 500)
     }
-});
+})
 
-export default main;
+export default main

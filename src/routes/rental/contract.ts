@@ -111,9 +111,6 @@ contracts.post('/:dormitoryId',
     if (!room) {
         return c.json({ error: 'ไม่พบห้องที่ระบุ' }, 404)
     }
-    if (room.status !== 'vacant') {
-        return c.json({ error: 'ห้องนี้ไม่ว่าง ไม่สามารถสร้างสัญญาได้' }, 409)
-    }
 
     // --- สร้าง tenant ---
     const tenantId = crypto.randomUUID()
