@@ -117,12 +117,12 @@ meters.get('/:dormitoryId/rooms-with-prev',
         LIMIT 1
       `).bind(room.room_id).first<{ id: string }>()
 
-      // prev = มิเตอร์ครั้งล่าสุดก่อน date นี้ (by room_id)
+      // prev = มิเตอร์ครั้งล่าสุดก่อน date นี้ (by room_id) — ใช้ DATE() เพื่อให้ compare ถูกต้องใน SQLite
       const prev = await db.prepare(`
         SELECT water_unit_current, electric_unit_current, reading_date
         FROM meter_readings
-        WHERE room_id = ? AND reading_date < ?
-        ORDER BY reading_date DESC
+        WHERE room_id = ? AND DATE(reading_date) < DATE(?)
+        ORDER BY DATE(reading_date) DESC
         LIMIT 1
       `).bind(room.room_id, readingDate).first<{
         water_unit_current: number
@@ -134,7 +134,7 @@ meters.get('/:dormitoryId/rooms-with-prev',
       const today = await db.prepare(`
         SELECT id, water_unit_current, electric_unit_current
         FROM meter_readings
-        WHERE room_id = ? AND reading_date = ?
+        WHERE room_id = ? AND DATE(reading_date) = DATE(?)
         LIMIT 1
       `).bind(room.room_id, readingDate).first<{
         id: string
@@ -212,8 +212,8 @@ meters.post('/:dormitoryId',
     const prev = await db.prepare(`
       SELECT water_unit_current, electric_unit_current
       FROM meter_readings
-      WHERE room_id = ? AND reading_date < ?
-      ORDER BY reading_date DESC
+      WHERE room_id = ? AND DATE(reading_date) < DATE(?)
+      ORDER BY DATE(reading_date) DESC
       LIMIT 1
     `).bind(room_id, reading_date).first<{ water_unit_current: number; electric_unit_current: number }>()
 
