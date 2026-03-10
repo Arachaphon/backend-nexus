@@ -212,6 +212,56 @@ meters.post('/:dormitoryId',
   }
 )
 
+meters.post('/:dormitoryId/init',
+  requireDormitoryAccess,
+  requireRole(['owner', 'manager', 'staff']),
+  async (c) => {
+    const db = c.env.DB
+    const body = await c.req.json()
+    const { room_id, contract_id, reading_date, water_unit_current, electric_unit_current } = body
+
+    if (!room_id || !reading_date || water_unit_current == null || electric_unit_current == null)
+      return c.json({ error: 'กรุณากรอกข้อมูลให้ครบ' }, 400)
+
+    if (Number(water_unit_current) < 0 || Number(electric_unit_current) < 0)
+      return c.json({ error: 'เลขมิเตอร์ต้องไม่ติดลบ' }, 400)
+
+    const room = await db.prepare(`SELECT id FROM rooms WHERE id = ?`).bind(room_id).first()
+    if (!room) return c.json({ error: 'ไม่พบห้องที่ระบุ' }, 404)
+
+    if (contract_id) {
+      const contract = await db.prepare(`SELECT id FROM contracts WHERE id = ?`).bind(contract_id).first()
+      if (!contract) return c.json({ error: 'ไม่พบสัญญาที่ระบุ' }, 404)
+    }
+    if (contract_id) {
+      const existing = await db.prepare(
+        `SELECT id FROM meter_readings WHERE contract_id = ? LIMIT 1`
+      ).bind(contract_id).first()
+      if (existing) return c.json({ error: 'มีการบันทึกมิเตอร์สำหรับสัญญานี้แล้ว' }, 409)
+    }
+
+    const id = crypto.randomUUID()
+
+    await db.prepare(`
+      INSERT INTO meter_readings (
+        id, room_id, contract_id, reading_date,
+        water_unit_current, electric_unit_current,
+        water_unit_previous, electric_unit_previous
+      ) VALUES (?, ?, ?, ?, ?, ?, 0, 0)
+    `).bind(
+      id,
+      room_id,
+      contract_id ?? null,
+      reading_date,
+      Number(water_unit_current),
+      Number(electric_unit_current)
+    ).run()
+
+    const record = await db.prepare(`SELECT * FROM meter_readings WHERE id = ?`).bind(id).first()
+    return c.json({ success: true, data: record }, 201)
+  }
+)
+
 meters.patch('/:dormitoryId/contracts/:contractId',
   requireDormitoryAccess,
   requireRole(['owner', 'manager', 'staff']),
