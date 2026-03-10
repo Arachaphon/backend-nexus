@@ -22,7 +22,7 @@
 ---
 
 ## 🌐 Demo
-🔗 [ทดลองใช้งานระบบจัดการหอพัก](thenexus-chi.vercel.app)
+🔗 [ทดลองใช้งานระบบจัดการหอพัก](https://thenexus-chi.vercel.app/)
 
 ---
 ## 🛠 Forntend github and Forntend gitLab
