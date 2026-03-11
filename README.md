@@ -38,7 +38,7 @@
 - **React** – Framework สำหรับพัฒนา User Interface แบบ Reactive
 - **Tailwind CSS** – สำหรับการออกแบบดีไซน์ที่รองรับทุกหน้าจอ (Responsive Design)
 - **TypeScript** – เพื่อเพิ่มประสิทธิภาพในการจัดการโครงสร้างข้อมูลและลดข้อผิดพลาด
-- **CloundFlare D1** – Backend-as-a-Service สำหรับระบบฐานข้อมูล (PostgreSQL) และ Authentication
+- **CloundFlare D1** – Serverless SQLite database
 
 ---
 
