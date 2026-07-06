@@ -194,7 +194,24 @@ CREATE TABLE IF NOT EXISTS bank_accounts (
     FOREIGN KEY (dormitories_id) REFERENCES dormitories(id) ON DELETE CASCADE
 );
 
+-- Migration: Add repair_requests table
+CREATE TABLE IF NOT EXISTS repair_requests (
+    id TEXT PRIMARY KEY,
+    room_id TEXT NOT NULL,
+    report_date DATE NOT NULL,
+    appoint_date DATE NOT NULL,
+    details TEXT NOT NULL CHECK(length(details) <= 70),
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'completed')),
+    complete_date DATE,
+    cost REAL,
+    complete_details TEXT CHECK(complete_details IS NULL OR length(complete_details) <= 70),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+);
 
+CREATE INDEX IF NOT EXISTS idx_repair_requests_room_id ON repair_requests(room_id);
+CREATE INDEX IF NOT EXISTS idx_repair_requests_status ON repair_requests(status);
 CREATE INDEX IF NOT EXISTS idx_contracts_room_id ON contracts(room_id);
 CREATE INDEX IF NOT EXISTS idx_contract_tenants_contract_id ON contract_tenants(contract_id);
 CREATE INDEX IF NOT EXISTS idx_contract_tenants_tenant_id ON contract_tenants(tenant_id);
